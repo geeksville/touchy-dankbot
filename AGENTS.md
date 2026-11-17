@@ -15,9 +15,10 @@ of the **creep3r** art project. This repo is standalone: it depends on the
 
 | Path | Purpose |
 |------|---------|
-| `src/voicebot/cli.py` | `click` CLI: `reply` / `models` / `listen` (`listen` always scrolls on the pad). |
-| `src/voicebot/server.py` | `ChatClient` (OpenAI `/v1` + native `/api/chat`) + `VoicebotError`. |
+| `src/voicebot/cli.py` | `click` CLI: `reply` / `models` / `jokemark` / `listen` (`listen` always scrolls on the pad). |
+| `src/voicebot/server.py` | `ChatClient` (OpenAI `/v1` + native `/api/chat`, plus `has_model` / `pull_model`) + `VoicebotError`. |
 | `src/voicebot/responder.py` | Persona → prompt → reply, and the reply value object. |
+| `src/voicebot/jokemark.py` | The model bake-off: matrix/corpus loaders, run loop, Markdown report. |
 | `src/voicebot/persona.py` | The default persona (the toaster robot). |
 | `src/voicebot/commands.py` | The `/command` channel (`/notfunny`, `/color/NAME`). |
 | `src/voicebot/audio.py` | Mic capture + Moonshine STT (the audio-in stage). |
@@ -26,6 +27,7 @@ of the **creep3r** art project. This repo is standalone: it depends on the
 | `src/voicebot/display.py` | The **only** module that imports `touchy_pad` (the display stage: LED marquee or LCD text field). |
 | `src/voicebot/logs.py` | Terminal logging (rich): `HEARD` / `SKIP` / `REPLY` in colour, quips in their display colours. |
 | `src/voicebot/config.py` | Defaults + the `Settings` value objects. |
+| `src/voicebot/assets/` | Packaged jokemark data: `overheard.txt` + `jokemark-models.json` (read via `importlib.resources`). |
 | `tests/` | pytest (network-free; audio + touchy-pad are faked). |
 | `docs/` | `plans/` (design), `hardware.md`, `TODO.md`. |
 | `justfile` | All dev tasks — prefer `just <recipe>`. |
@@ -44,6 +46,7 @@ just lint                  # ruff format + check
 just build                 # wheel + sdist into dist/
 just reply -- --line "..."  # run the CLI in the venv
 just listen -- --fake sim-overheard.txt
+just jokemark              # model bake-off → jokemark.md (needs the server)
 just bump-version          # bump version, commit, tag, push
 ```
 

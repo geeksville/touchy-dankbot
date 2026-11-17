@@ -1,10 +1,13 @@
 """The ``voicebot`` command line.
 
-Two commands:
+Four commands:
 
 * ``voicebot reply`` — read overheard lines (``--line`` / ``-f FILE`` / stdin)
   and print a witty reply for each (commands stripped; ``/notfunny`` suppresses).
 * ``voicebot models`` — list the models the server has pulled.
+* ``voicebot jokemark`` — the model bake-off: every model/params in a JSON
+  matrix against the packaged overheard corpus, rendered to Markdown.
+* ``voicebot listen`` — mic → Moonshine → gate → reply, scrolled on the pad.
 
 Config resolution is *flag → env → default*, implemented via click's
 ``default=`` + ``envvar=`` (see :mod:`voicebot.config`). The chat client is
@@ -16,6 +19,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+from pathlib import Path
 from typing import TextIO
 
 import click
@@ -39,6 +43,18 @@ from .config import (
 )
 from .display import DEFAULT_CLEAR_AFTER_S, DISPLAY_MODES, SCREEN_NAME, PadDisplay
 from .gate import UtteranceGate
+from .jokemark import (
+    CORPUS_ASSET,
+    MATRIX_ASSET,
+    JokemarkError,
+    ModelResult,
+    ModelSpec,
+    load_lines,
+    load_matrix,
+    packaged_text,
+    render_markdown,
+    run_benchmark,
+)
 from .listen import Listener, json_emitter
 from .persona import DEFAULT_PERSONA
 from .responder import Reply, Responder
@@ -154,6 +170,25 @@ def _make_display(screen_name: str, clear_after_s: float, display_mode: str) -> 
     )
     display.start()  # the "I'm voicebot" banner (connects lazily)
     return display
+
+
+def _read_asset_or_file(path: Path | None, asset: str) -> str:
+    """Read a jokemark input: the given file, else the packaged asset."""
+    return path.read_text(encoding="utf-8") if path is not None else packaged_text(asset)
+
+
+def _settings_for(spec: ModelSpec, url: str) -> Settings:
+    """The :class:`Settings` one matrix entry's bank runs with."""
+    return Settings(
+        url=url,
+        model=spec.model,
+        temperature=spec.temperature,
+        min_p=spec.min_p,
+        ctx=spec.ctx,
+        max_tokens=spec.max_tokens,
+        native=spec.native,
+        timeout=spec.timeout,
+    )
 
 
 @click.group()
@@ -368,6 +403,146 @@ def models(url: str, native: bool, timeout: float) -> None:
     except VoicebotError as exc:
         click.echo(f"voicebot: {exc}", err=True)
         raise SystemExit(1) from exc
+
+
+@main.command()
+@click.option(
+    "--models",
+    "models_file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="JSON model matrix (default: the packaged jokemark-models.json).",
+)
+@click.option(
+    "-f",
+    "--lines",
+    "lines_file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Overheard corpus (default: the packaged overheard.txt).",
+)
+@click.option(
+    "-o",
+    "--out",
+    "out",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=Path("jokemark.md"),
+    show_default=True,
+    help="Markdown report to write.",
+)
+@click.option("--url", default=DEFAULT_URL, envvar="VOICEBOT_URL", show_default=True)
+@click.option(
+    "--native",
+    is_flag=True,
+    default=False,
+    envvar="VOICEBOT_NATIVE",
+    help="Use Ollama's /api/chat instead of /v1 (a matrix entry may override).",
+)
+@click.option(
+    "--timeout",
+    type=float,
+    default=DEFAULT_TIMEOUT,
+    envvar="VOICEBOT_TIMEOUT",
+    show_default=True,
+    help="Per-request chat timeout in seconds.",
+)
+@click.option(
+    "--pull/--no-pull",
+    "pull",
+    default=True,
+    show_default=True,
+    help="Fetch models the server does not have yet.",
+)
+@click.option("--limit", type=int, default=None, help="Only the first N corpus lines.")
+@click.option(
+    "--persona",
+    default=DEFAULT_PERSONA,
+    envvar="VOICEBOT_PERSONA",
+    help="System prompt (persona / comedic mechanism).",
+)
+@click.option(
+    "--persona-file",
+    type=click.File("r", encoding="utf-8"),
+    default=None,
+    help="Read the persona from FILE (wins over --persona).",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Print the resolved matrix and corpus size, then exit.",
+)
+def jokemark(
+    models_file: Path | None,
+    lines_file: Path | None,
+    out: Path,
+    url: str,
+    native: bool,
+    timeout: float,
+    pull: bool,
+    limit: int | None,
+    persona: str,
+    persona_file: TextIO | None,
+    dry_run: bool,
+) -> None:
+    """Bake off the quip stage: every model/params against every overheard line."""
+    if persona_file is not None:
+        persona = persona_file.read()
+    try:
+        specs = load_matrix(
+            _read_asset_or_file(models_file, MATRIX_ASSET), native=native, timeout=timeout
+        )
+        lines = load_lines(_read_asset_or_file(lines_file, CORPUS_ASSET), limit=limit)
+    except JokemarkError as exc:
+        click.echo(f"voicebot: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    if dry_run:
+        click.echo(f"{len(specs)} models × {len(lines)} lines")
+        for index, spec in enumerate(specs, 1):
+            click.echo(
+                f"  {index}. {spec.label} — {spec.model} "
+                f"(temp {spec.temperature:g}, min_p {spec.min_p:g}, ctx {spec.ctx}, "
+                f"max_tokens {spec.max_tokens}, native {'on' if spec.native else 'off'})"
+            )
+        return
+
+    logging.getLogger("voicebot").setLevel(logging.INFO)
+    completed: list[ModelResult] = []
+    interrupted = False
+    try:
+        results = run_benchmark(
+            specs,
+            lines,
+            persona=persona,
+            client_factory=lambda spec: ChatClient(_settings_for(spec, url)),
+            pull=pull,
+            on_result=completed.append,
+        )
+    except KeyboardInterrupt:  # pragma: no cover - interactive stop
+        interrupted = True
+        results = completed
+
+    report = render_markdown(
+        results,
+        lines,
+        url=url,
+        persona=persona,
+        corpus_name=lines_file.name if lines_file is not None else CORPUS_ASSET,
+        native=native,
+    )
+    try:
+        out.write_text(report, encoding="utf-8")
+    except OSError as exc:
+        click.echo(f"voicebot: cannot write {out}: {exc}", err=True)
+        raise SystemExit(1) from exc
+    click.echo(f"wrote {out}")
+    if interrupted:  # pragma: no cover - interactive stop
+        click.echo("voicebot: interrupted — partial report written.", err=True)
+        raise SystemExit(130)
+    if not any(row.reply is not None for model in results for row in model.results):
+        click.echo("voicebot: no model produced a reply.", err=True)
+        raise SystemExit(1)
 
 
 def _input_lines(line: str | None, file: TextIO | None) -> list[str]:

@@ -25,6 +25,8 @@ tracked in git.
   text field; `<= 32`-px-tall panels keep the scrolling marquee.
 - `docs/plans/standalone.md` — extracting voicebot to its own repo (packaging,
   PyPI name, CI, devcontainer).
+- `docs/plans/jokemark.md` — the model bake-off (`voicebot jokemark`): packaged
+  overheard corpus × JSON model matrix → one Markdown report.
 
 Docs that are *not* plans: `docs/TODO.md` (loose backlog), `docs/hardware.md`
 (hardware notes), `docs/responder.md` / `docs/transcribe.md` (research notes).

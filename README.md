@@ -90,6 +90,9 @@ voicebot listen
 
 # Replay a file instead — no mic, no model (the pad still gets the quips):
 voicebot listen --fake sim-overheard.txt
+
+# Bake off models: packaged corpus × model matrix → jokemark.md
+voicebot jokemark
 ```
 
 ## Commands
@@ -98,6 +101,7 @@ voicebot listen --fake sim-overheard.txt
 |---|---|
 | `voicebot reply` | Read overheard lines (`--line` / `-f FILE` / stdin) and print a witty reply for each (`--json` for `{input, reply, skip, model, raw}` per line). Commands are stripped from the printed text, so a `/notfunny` reply prints nothing. |
 | `voicebot models` | List the models the server has pulled. |
+| `voicebot jokemark` | Bake off the quip stage: every model/params in a JSON matrix against the packaged overheard corpus (fetching missing models), writing a Markdown report (default `jokemark.md`). `--dry-run` shows the matrix without touching the network. |
 | `voicebot listen` | Listen to the mic, transcribe with **Moonshine**, log `HEARD:` / `SKIP(...)` / `REPLY:` per utterance, and scroll each quip on an attached touchy-pad; `--fake FILE` replays a text file instead (no mic, no model). |
 
 Configuration is **flag -> env -> default** — click implements the precedence:
@@ -115,6 +119,35 @@ Configuration is **flag -> env -> default** — click implements the precedence:
 
 Try the funnier-but-more-erratic 12B model:
 `--model hf.co/bartowski/Human-Like-Mistral-Nemo-Instruct-2407-GGUF:Q8_0`.
+
+## Model bake-off (jokemark)
+
+`voicebot jokemark` runs the quip stage over a corpus instead of one line at a
+time:
+
+```sh
+just jokemark                    # or: voicebot jokemark
+voicebot jokemark --dry-run      # print the resolved matrix + line count
+voicebot jokemark --models mine.json -o report.md --no-pull
+```
+
+* **Corpus:** `src/voicebot/assets/overheard.txt` — the six
+  `sim-overheard.txt` smoke lines plus restaurant/dinner-party conversation,
+  shipped in the package and read with `importlib.resources`.
+* **Matrix:** `src/voicebot/assets/jokemark-models.json` — model paths plus
+  optional `label`, `temperature`, `min_p`, `ctx`, `max_tokens`, `native` and
+  `timeout`. `defaults` apply to every row; a row overrides them. Add a
+  candidate model there (or in your own `--models` file) to put it in the
+  bake-off.
+* **Fetching:** missing models are pulled via Ollama's `/api/pull` first
+  (`--no-pull` records them as errors instead).
+* **Report:** one Markdown file with a summary table (replies / skips / errors /
+  median / slowest) and, per model, every line with the quip it produced, the
+  raw output (commands visible) and the latency. `jokemark.md` is a generated
+  artifact and is gitignored.
+
+The first six corpus lines are the old manual-testing file, so the bake-off
+keeps covering everything `voicebot reply -f sim-overheard.txt` used to.
 
 ## The name of the game
 

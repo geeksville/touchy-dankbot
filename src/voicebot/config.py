@@ -31,6 +31,11 @@ DEFAULT_MAX_TOKENS = 120
 #: HTTP timeout (seconds). Generous: a cold 12B+ model can take a while to load.
 DEFAULT_TIMEOUT = 120.0
 
+#: Model-pull timeout (seconds), for jokemark's fetch-if-missing. Much longer
+#: than a chat request: pulling the 12B Q8_0 GGUF is ~13 GB, minutes over a home
+#: uplink, not seconds.
+DEFAULT_PULL_TIMEOUT = 3600.0
+
 
 @dataclass(frozen=True)
 class Settings:

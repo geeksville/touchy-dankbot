@@ -14,6 +14,9 @@ class FakeClient:
     """Stand-in for ``voicebot.server.ChatClient`` keyed by user line."""
 
     replies: ClassVar[dict[str, str]] = {}
+    #: ``None`` means "every model is already pulled"; a set restricts it.
+    available: ClassVar[set[str] | None] = None
+    pulled: ClassVar[list[str]] = []
 
     def __init__(self, settings):
         self.model = settings.model
@@ -23,6 +26,12 @@ class FakeClient:
 
     def list_models(self):
         return ["hermes", "nemo"]
+
+    def has_model(self, name):
+        return FakeClient.available is None or name in FakeClient.available
+
+    def pull_model(self, name):
+        FakeClient.pulled.append(name)
 
 
 class FakeDisplay:
@@ -51,6 +60,8 @@ class FakeDisplay:
 
 def _use_fake(monkeypatch, replies=None, client=None):
     FakeClient.replies = replies or {}
+    FakeClient.available = None
+    FakeClient.pulled = []
     FakeDisplay.instances = []
     monkeypatch.setattr(cli, "ChatClient", client or FakeClient)
     monkeypatch.setattr(cli, "PadDisplay", FakeDisplay)
@@ -207,3 +218,102 @@ def test_listen_logs_heard_and_reply(monkeypatch, tmp_path, caplog):
     assert result.exit_code == 0
     assert "HEARD: the bread is done baking" in caplog.text
     assert "REPLY: Time to toast!" in caplog.text
+
+
+# -- jokemark -----------------------------------------------------------------
+
+
+def _all_output(result) -> str:
+    """stdout + stderr (click 8.1 mixes them into .output; 8.2 splits them)."""
+    return result.output + getattr(result, "stderr", "")
+
+
+def _matrix(path, models):
+    path.write_text(json.dumps({"version": 1, "models": models}), encoding="utf-8")
+    return path
+
+
+def _corpus(path, lines):
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+def test_jokemark_dry_run_prints_the_matrix(monkeypatch, tmp_path):
+    _use_fake(monkeypatch)
+    matrix = _matrix(
+        tmp_path / "models.json",
+        [
+            {"model": "m1", "label": "one"},
+            {"model": "m2", "label": "two", "temperature": 0.0},
+        ],
+    )
+    corpus = _corpus(tmp_path / "overheard.txt", ["hello there", "bye now"])
+    out = tmp_path / "report.md"
+    result = CliRunner().invoke(
+        cli.main,
+        ["jokemark", "--models", str(matrix), "-f", str(corpus), "-o", str(out), "--dry-run"],
+    )
+    assert result.exit_code == 0
+    assert "2 models × 2 lines" in result.output
+    assert "one — m1" in result.output
+    assert "temp 0" in result.output
+    assert not out.exists()
+
+
+def test_jokemark_writes_a_report_and_pulls_only_the_missing_model(monkeypatch, tmp_path):
+    _use_fake(monkeypatch, {"hello there": "hi", "bye now": "/notfunny"})
+    FakeClient.available = {"m1"}
+    matrix = _matrix(
+        tmp_path / "models.json",
+        [{"model": "m1", "label": "one"}, {"model": "m2", "label": "two"}],
+    )
+    corpus = _corpus(tmp_path / "overheard.txt", ["hello there", "bye now"])
+    out = tmp_path / "report.md"
+    result = CliRunner().invoke(
+        cli.main, ["jokemark", "--models", str(matrix), "-f", str(corpus), "-o", str(out)]
+    )
+    assert result.exit_code == 0
+    assert FakeClient.pulled == ["m2"]
+    assert f"wrote {out}" in result.output
+    report = out.read_text(encoding="utf-8")
+    assert "## 1. one" in report
+    assert "## 2. two" in report
+    assert "— *(/notfunny)*" in report
+
+
+def test_jokemark_no_pull_records_the_missing_model(monkeypatch, tmp_path):
+    _use_fake(monkeypatch)
+    FakeClient.available = set()
+    matrix = _matrix(tmp_path / "models.json", [{"model": "m1", "label": "one"}])
+    corpus = _corpus(tmp_path / "overheard.txt", ["hello there"])
+    out = tmp_path / "report.md"
+    result = CliRunner().invoke(
+        cli.main,
+        ["jokemark", "--models", str(matrix), "-f", str(corpus), "-o", str(out), "--no-pull"],
+    )
+    assert result.exit_code == 1  # nothing produced a reply
+    assert FakeClient.pulled == []
+    assert "not pulled" in out.read_text(encoding="utf-8")
+
+
+def test_jokemark_rejects_a_bad_matrix(monkeypatch, tmp_path):
+    _use_fake(monkeypatch)
+    matrix = tmp_path / "models.json"
+    matrix.write_text("{}", encoding="utf-8")
+    corpus = _corpus(tmp_path / "overheard.txt", ["hello there"])
+    result = CliRunner().invoke(
+        cli.main,
+        ["jokemark", "--models", str(matrix), "-f", str(corpus), "-o", str(tmp_path / "r.md")],
+    )
+    assert result.exit_code == 1
+    assert "matrix" in _all_output(result)
+
+
+def test_jokemark_dry_run_reads_the_packaged_assets(monkeypatch, tmp_path):
+    _use_fake(monkeypatch)
+    result = CliRunner().invoke(
+        cli.main, ["jokemark", "--dry-run", "--limit", "3", "-o", str(tmp_path / "r.md")]
+    )
+    assert result.exit_code == 0
+    assert "models × 3 lines" in result.output
+    assert "hermes-3-8b" in result.output

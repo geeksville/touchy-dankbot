@@ -5,3 +5,5 @@ __pycache__/
 .ruff_cache/
 .venv/
 dist/
+# jokemark's generated Markdown report (repo root; keep plans/reports elsewhere)
+/jokemark.md

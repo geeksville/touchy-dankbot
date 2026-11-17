@@ -19,9 +19,14 @@ import logging
 import requests
 from openai import OpenAI
 
-from .config import Settings
+from .config import DEFAULT_PULL_TIMEOUT, Settings
 
 log = logging.getLogger(__name__)
+
+
+def _strip_latest(name: str) -> str:
+    """``foo:latest`` → ``foo`` — Ollama adds the tag when a pull omits it."""
+    return name.removesuffix(":latest")
 
 
 class VoicebotError(RuntimeError):
@@ -105,3 +110,30 @@ class ChatClient:
             return [m["name"] for m in resp.json().get("models", [])]
         except Exception as exc:
             raise VoicebotError(f"{type(exc).__name__}: {exc}") from exc
+
+    # -- fetch -------------------------------------------------------------
+
+    def has_model(self, name: str) -> bool:
+        """True if *name* is already pulled (tolerating Ollama's implicit ``:latest``)."""
+        wanted = _strip_latest(name)
+        return any(_strip_latest(model) == wanted for model in self.list_models())
+
+    def pull_model(self, name: str, *, timeout: float = DEFAULT_PULL_TIMEOUT) -> None:
+        """Ask the server to pull *name* (blocking; ``stream`` off).
+
+        ``/api/pull`` only exists on Ollama's native API — this is independent of
+        the ``--native`` chat setting. A pull can take minutes for a multi-GB
+        GGUF, hence its own (much longer) default timeout.
+        """
+        try:
+            resp = requests.post(
+                f"{self._s.url}/api/pull",
+                json={"model": name, "stream": False},
+                timeout=timeout,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as exc:
+            raise VoicebotError(f"{type(exc).__name__}: {exc}") from exc
+        if data.get("error"):
+            raise VoicebotError(f"pull {name}: {data['error']}")
