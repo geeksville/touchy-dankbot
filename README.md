@@ -101,7 +101,7 @@ voicebot jokemark
 |---|---|
 | `voicebot reply` | Read overheard lines (`--line` / `-f FILE` / stdin) and print a witty reply for each (`--json` for `{input, reply, skip, model, raw}` per line). Commands are stripped from the printed text, so a `/notfunny` reply prints nothing. |
 | `voicebot models` | List the models the server has pulled. |
-| `voicebot jokemark` | Bake off the quip stage: every model/params in a TOML matrix against the packaged overheard corpus (fetching missing models), writing a Markdown report (default `jokemark.md`). `--dry-run` shows the matrix without touching the network. |
+| `voicebot jokemark` | Bake off the quip stage: every model/params in a TOML matrix against the packaged overheard corpus (fetching missing models), writing a Markdown report (default `jokemark.md`). `--dry-run` shows the matrix without touching the network. If a touchy-pad is attached, each reply is also drawn on it as it is produced (entirely optional). |
 | `voicebot listen` | Listen to the mic, transcribe with **Moonshine**, log `HEARD:` / `SKIP(...)` / `REPLY:` per utterance, and scroll each quip on an attached touchy-pad; `--fake FILE` replays a text file instead (no mic, no model). |
 
 Configuration is **flag -> env -> default** — click implements the precedence:
@@ -144,6 +144,11 @@ voicebot jokemark --models mine.toml -o report.md --no-pull
   entry out to retire it, leaving the verdict beside it.
 * **Fetching:** missing models are pulled via Ollama's `/api/pull` first
   (`--no-pull` records them as errors instead).
+* **Pad (optional):** if a touchy-pad is attached when the run starts, every
+  reply is also drawn on it as it arrives — the same parsed colour runs
+  `voicebot listen` scrolls. A missing pad is ignored (one warning, no
+  per-reply probing), so the bake-off never waits for hardware;
+  `--display-mode` picks the layout.
 * **Report:** one Markdown file with a summary table (replies / skips / errors /
   median / slowest) and, per model, every line with the quip it produced, the
   raw output (commands visible) and the latency. `jokemark.md` is a generated

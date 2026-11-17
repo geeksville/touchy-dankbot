@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from . import logs
 from .audio import Utterance
 from .commands import Run
+from .display import DisplaySink
 from .gate import UtteranceGate
 from .responder import Responder
 
@@ -61,10 +62,6 @@ class ListenEvent:
 
 
 Emitter = Callable[[ListenEvent], None]
-
-#: A display sink: handed one quip's colour runs (see :mod:`voicebot.display`).
-#: ``None`` means "log only, show nothing".
-DisplaySink = Callable[[tuple[Run, ...]], None]
 
 
 def log_emitter(event: ListenEvent) -> None:

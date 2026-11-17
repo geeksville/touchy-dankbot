@@ -13,8 +13,10 @@ voicebot reply -f sim-overheard.txt --model B | tee b.txt
 with one command that runs a **packaged, restaurant/dinner-party corpus**
 against a **TOML model matrix**, pulls whatever the server is missing, and
 writes a **single Markdown report** with one section per model/parameter set.
-It exercises only the responder (persona → prompt → reply → `/command` parse);
-the mic, gate and display are deliberately not involved.
+It exercises the responder (persona → prompt → reply → `/command` parse); the
+mic and gate are deliberately not involved, and the display is **optional** — a
+touchy-pad that happens to be attached echoes each reply as it is produced, but
+the bake-off never needs one.
 
 > **Status: DONE (2026-11-17).** Implemented as planned:
 >
@@ -34,6 +36,15 @@ the mic, gate and display are deliberately not involved.
 > * **CLI** — `voicebot jokemark` with `--models`, `-f/--lines`, `-o/--out`,
 >   `--url`, `--native`, `--timeout`, `--pull/--no-pull`, `--limit`,
 >   `--persona`, `--persona-file`, `--dry-run`; `just jokemark`.
+> * **Optional display (2026-11-17)** — `run_benchmark` takes a `display` sink
+>   (`voicebot.display.DisplaySink`) and hands it each non-skip reply's
+>   `Reply.runs` — the same parsed runs `voicebot listen` scrolls. `voicebot
+>   jokemark` probes for a touchy-pad **once** at the start (`PadDisplay.start()`
+>   now returns whether anything was drawn) and passes `PadDisplay.show` only if
+>   one answers; a missing pad is ignored after one warning, so a long run does
+>   not retry the USB bus per reply. A pad lost mid-run is dropped and
+>   reconnected as in `listen`, and a failing sink is logged, never fatal.
+>   `--display-mode` (env `VOICEBOT_DISPLAY_MODE`) picks auto/scroll/multiline.
 > * **Docs** — README "Model bake-off (jokemark)", AGENTS layout/commands,
 >   `.clinerules/plans.md` index; `jokemark.md` gitignored as an artifact.
 > * **Matrix update (2026-11-17)** — added four newer candidates at `Q4_K_M`

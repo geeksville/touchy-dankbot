@@ -172,6 +172,21 @@ def _make_display(screen_name: str, clear_after_s: float, display_mode: str) -> 
     return display
 
 
+def _optional_display(display_mode: str) -> PadDisplay | None:
+    """A pad for ``jokemark``, or ``None`` when no touchy-pad is attached.
+
+    ``listen`` reaches for the pad on every message so one plugged in later is
+    picked up; a bake-off is a batch job whose real output is the report, so this
+    probes once at the start. ``clear_after=0`` keeps the last quip up and avoids
+    an idle timer on a run that can take an hour.
+    """
+    display = PadDisplay(screen_name=SCREEN_NAME, clear_after=0, display_mode=display_mode)
+    if display.start():
+        return display
+    display.close()
+    return None
+
+
 def _read_asset_or_file(path: Path | None, asset: str) -> str:
     """Read a jokemark input: the given file, else the packaged asset."""
     return path.read_text(encoding="utf-8") if path is not None else packaged_text(asset)
@@ -455,6 +470,15 @@ def models(url: str, native: bool, timeout: float) -> None:
 )
 @click.option("--limit", type=int, default=None, help="Only the first N corpus lines.")
 @click.option(
+    "--display-mode",
+    "display_mode",
+    type=click.Choice(DISPLAY_MODES),
+    default=DEFAULT_DISPLAY_MODE,
+    envvar="VOICEBOT_DISPLAY_MODE",
+    show_default=True,
+    help="Layout for a touchy-pad that happens to be attached (auto, scroll, multiline).",
+)
+@click.option(
     "--persona",
     default=DEFAULT_PERSONA,
     envvar="VOICEBOT_PERSONA",
@@ -481,6 +505,7 @@ def jokemark(
     timeout: float,
     pull: bool,
     limit: int | None,
+    display_mode: str,
     persona: str,
     persona_file: TextIO | None,
     dry_run: bool,
@@ -508,6 +533,7 @@ def jokemark(
         return
 
     logging.getLogger("voicebot").setLevel(logging.INFO)
+    display = _optional_display(display_mode)  # None when no pad is attached
     completed: list[ModelResult] = []
     interrupted = False
     try:
@@ -518,10 +544,14 @@ def jokemark(
             client_factory=lambda spec: ChatClient(_settings_for(spec, url)),
             pull=pull,
             on_result=completed.append,
+            display=display.show if display is not None else None,
         )
     except KeyboardInterrupt:  # pragma: no cover - interactive stop
         interrupted = True
         results = completed
+    finally:
+        if display is not None:
+            display.close()
 
     report = render_markdown(
         results,

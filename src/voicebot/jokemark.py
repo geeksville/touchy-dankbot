@@ -8,6 +8,12 @@ Deliberately transport-free in the same way as :mod:`voicebot.responder`: the
 benchmark takes a ``client_factory`` (``ModelSpec -> ChatClient``) so tests use a
 fake and never pull or chat. Only :mod:`voicebot.cli` wires in the real client.
 
+A run may also be handed a **display sink** (the CLI passes ``PadDisplay.show``
+when a touchy-pad happens to be attached): every reply that is not a
+``/notfunny`` skip is then drawn as it arrives, using the same parsed colour
+runs ``voicebot listen`` shows. The device is entirely optional — no sink means
+"report only", and a sink that fails must never cost the bake-off its run.
+
 The corpus and the matrix live in ``voicebot/assets/`` and are read through
 :mod:`importlib.resources`, so an installed wheel behaves exactly like a source
 checkout. The matrix is TOML (stdlib :mod:`tomllib`, no dependency) rather than
@@ -35,6 +41,7 @@ from .config import (
     DEFAULT_TEMPERATURE,
     DEFAULT_TIMEOUT,
 )
+from .display import DisplaySink
 from .responder import Reply, Responder
 from .server import VoicebotError
 
@@ -252,6 +259,7 @@ def run_benchmark(
     client_factory: Callable[[ModelSpec], ChatBackend],
     pull: bool,
     on_result: Callable[[ModelResult], None] | None = None,
+    display: DisplaySink | None = None,
     log: logging.Logger = log,
 ) -> list[ModelResult]:
     """Run every spec against every line, one model at a time.
@@ -261,6 +269,10 @@ def run_benchmark(
     aborts that bank only — a down server should not cost the remaining models
     their turn. *on_result* is called as each bank completes, so the CLI can
     still render a partial report after Ctrl-C.
+
+    *display*, when given, receives each non-skip reply's colour runs as the
+    reply arrives (the same ``Reply.runs`` ``voicebot listen`` shows); it is
+    optional and a failing sink is logged, never fatal.
     """
     results: list[ModelResult] = []
     for spec in specs:
@@ -297,6 +309,8 @@ def run_benchmark(
                     break
                 elapsed = time.monotonic() - started
                 line_results.append(LineResult(line=line, reply=reply, elapsed_s=elapsed))
+                if display is not None and not reply.skip:
+                    _show(display, reply)
                 log.info("%s %d/%d", spec.label, index, len(lines))
 
         result = ModelResult(
@@ -309,6 +323,14 @@ def run_benchmark(
         if on_result is not None:
             on_result(result)
     return results
+
+
+def _show(display: DisplaySink, reply: Reply) -> None:
+    """Draw one quip on the optional display — a broken pad is not fatal."""
+    try:
+        display(reply.runs)
+    except Exception:  # a bad display must not stop the bake-off
+        log.exception("display update failed")
 
 
 def _cell(text: str) -> str:

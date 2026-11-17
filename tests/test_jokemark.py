@@ -221,7 +221,7 @@ def test_the_packaged_matrix_covers_the_default_model():
 # -- the run loop -------------------------------------------------------------
 
 
-def _run(backend, lines=("hello", "bye"), *, specs=None, pull=False, on_result=None):
+def _run(backend, lines=("hello", "bye"), *, specs=None, pull=False, on_result=None, display=None):
     return run_benchmark(
         specs or (ModelSpec(label="a", model="m"),),
         lines,
@@ -229,6 +229,7 @@ def _run(backend, lines=("hello", "bye"), *, specs=None, pull=False, on_result=N
         client_factory=lambda _spec: backend,
         pull=pull,
         on_result=on_result,
+        display=display,
     )
 
 
@@ -248,6 +249,35 @@ def test_a_notfunny_reply_is_a_skip():
     (bank,) = _run(FakeBackend(replies={"hello": "/notfunny"}), lines=("hello",))
     assert bank.results[0].reply.skip is True
     assert bank.results[0].reply.text == ""
+
+
+# -- the optional display ------------------------------------------------------
+
+
+def test_the_display_sink_sees_each_reply_but_not_a_skip():
+    """The same parsed runs ``listen`` shows — commands stripped, colours kept."""
+    shown: list[tuple] = []
+    (bank,) = _run(
+        FakeBackend(replies={"hello": "/color/red hi", "bye": "/notfunny"}),
+        display=shown.append,
+    )
+    assert len(bank.results) == 2
+    assert ["".join(run.text for run in runs) for runs in shown] == ["hi"]
+    assert shown[0][0].colour == 0xFF0000  # /color/red
+
+
+def test_a_broken_display_sink_does_not_stop_the_benchmark():
+    def boom(runs):
+        raise RuntimeError("no pad")
+
+    (bank,) = _run(FakeBackend(), display=boom)
+    assert len(bank.results) == 2
+    assert all(row.reply is not None for row in bank.results)
+
+
+def test_no_display_sink_is_the_default():
+    (bank,) = _run(FakeBackend())
+    assert len(bank.results) == 2
 
 
 def test_a_missing_model_is_pulled_first():

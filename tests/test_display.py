@@ -324,6 +324,23 @@ def test_a_headless_panel_is_reported_and_skipped(caplog):
     assert "0x0" in caplog.text
 
 
+def test_show_and_start_report_whether_a_pad_was_drawn():
+    """``jokemark`` uses this to skip a machine with no pad — without retrying."""
+    assert PadDisplay(FakePad(), clear_after=0).show([Run("hi")]) is True
+
+
+def test_show_and_start_are_false_without_a_pad(monkeypatch):
+    from voicebot import display as display_mod
+
+    def no_pad():
+        raise RuntimeError("no pad")
+
+    monkeypatch.setattr(display_mod, "connect", no_pad)
+    display = display_mod.PadDisplay(clear_after=0)
+    assert display.show([Run("hi")]) is False
+    assert display.start() is False
+
+
 def test_a_lost_pad_is_dropped_and_reconnects_next_time():
     pad = FakePad(failures=1)  # the write fails ⇒ the handle is dropped
     display = PadDisplay(pad, clear_after=0)

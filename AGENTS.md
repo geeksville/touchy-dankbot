@@ -18,7 +18,7 @@ of the **creep3r** art project. This repo is standalone: it depends on the
 | `src/voicebot/cli.py` | `click` CLI: `reply` / `models` / `jokemark` / `listen` (`listen` always scrolls on the pad). |
 | `src/voicebot/server.py` | `ChatClient` (OpenAI `/v1` + native `/api/chat`, plus `has_model` / `pull_model`) + `VoicebotError`. |
 | `src/voicebot/responder.py` | Persona → prompt → reply, and the reply value object. |
-| `src/voicebot/jokemark.py` | The model bake-off: matrix/corpus loaders, run loop, Markdown report. |
+| `src/voicebot/jokemark.py` | The model bake-off: matrix/corpus loaders, run loop, Markdown report, optional pad echo. |
 | `src/voicebot/persona.py` | The default persona (the toaster robot). |
 | `src/voicebot/commands.py` | The `/command` channel (`/notfunny`, `/color/NAME`). |
 | `src/voicebot/audio.py` | Mic capture + Moonshine STT (the audio-in stage). |

@@ -32,6 +32,10 @@ from .commands import Run
 
 log = logging.getLogger(__name__)
 
+#: A display sink: handed one quip's colour runs (``Reply.runs``).
+#: :meth:`PadDisplay.show` is the real one; ``None`` in a loop means "show nothing".
+DisplaySink = Callable[[tuple[Run, ...]], None]
+
 #: On-device screen + widget names — the contract between the saved screen and
 #: the runtime property overrides. Deliberately *not* ``default`` so a later
 #: ``touchy init`` / ``touchy screen demo`` cannot clobber it (or vice-versa).
@@ -224,9 +228,9 @@ class PadDisplay:
 
     # -- lifecycle ---------------------------------------------------------
 
-    def start(self) -> None:
-        """Show the startup banner (connecting lazily, if a pad is attached)."""
-        self.show([Run(STARTUP_TEXT)])
+    def start(self) -> bool:
+        """Show the startup banner (connecting lazily); ``False`` when there is no pad."""
+        return self.show([Run(STARTUP_TEXT)])
 
     def close(self) -> None:
         """Stop the idle timer and release the pad (idempotent)."""
@@ -236,16 +240,23 @@ class PadDisplay:
 
     # -- the public verb ---------------------------------------------------
 
-    def show(self, runs: Sequence[Run]) -> None:
-        """Render *runs* on the pad (empty ⇒ clear) and (re)arm the idle timer."""
+    def show(self, runs: Sequence[Run]) -> bool:
+        """Render *runs* on the pad (empty ⇒ clear) and (re)arm the idle timer.
+
+        ``False`` means nothing was drawn — no pad is attached, or the one that
+        was is gone. Callers that treat the display as optional (``jokemark``)
+        use the result to stop asking a machine with no pad; ``listen`` ignores
+        it, because it wants a pad plugged in later to be picked up.
+        """
         with self._lock:
             pad = self._open()
             if pad is None:
-                return
+                return False
             if not self._write_quip(pad, runs):
                 self._forget_pad()
-                return
+                return False
             self._arm_timer()
+            return True
 
     def _write_quip(self, pad: Any, runs: Sequence[Run]) -> bool:
         """Send the quip; ``False`` means the pad looks gone (drop the handle).

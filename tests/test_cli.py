@@ -50,9 +50,11 @@ class FakeDisplay:
 
     def start(self):
         self.started = True
+        return True
 
     def show(self, runs):
         self.shown.append(runs)
+        return True
 
     def close(self):
         self.closed = True
@@ -266,6 +268,7 @@ def test_jokemark_dry_run_prints_the_matrix(monkeypatch, tmp_path):
     assert "one — m1" in result.output
     assert "temp 0" in result.output
     assert not out.exists()
+    assert FakeDisplay.instances == []  # --dry-run never reaches for the pad
 
 
 def test_jokemark_writes_a_report_and_pulls_only_the_missing_model(monkeypatch, tmp_path):
@@ -325,3 +328,55 @@ def test_jokemark_dry_run_reads_the_packaged_assets(monkeypatch, tmp_path):
     assert result.exit_code == 0
     assert "models × 3 lines" in result.output
     assert "hermes-3-8b" in result.output
+
+
+def test_jokemark_shows_each_reply_on_an_attached_pad(monkeypatch, tmp_path):
+    _use_fake(monkeypatch, {"hello there": "/color/red hi", "bye now": "/notfunny"})
+    matrix = _matrix(tmp_path / "models.toml", [{"model": "m1", "label": "one"}])
+    corpus = _corpus(tmp_path / "overheard.txt", ["hello there", "bye now"])
+    out = tmp_path / "report.md"
+    result = CliRunner().invoke(
+        cli.main,
+        [
+            "jokemark",
+            "--models",
+            str(matrix),
+            "-f",
+            str(corpus),
+            "-o",
+            str(out),
+            "--display-mode",
+            "multiline",
+        ],
+    )
+    assert result.exit_code == 0
+    display = FakeDisplay.instances[0]
+    assert display.started and display.closed
+    assert display.display_mode == "multiline"
+    # The same parsed runs `listen` shows: commands stripped, /notfunny skipped.
+    assert [[run.text for run in runs] for runs in display.shown] == [["hi"]]
+    assert display.shown[0][0].colour == 0xFF0000  # the /color/red run
+
+
+def test_jokemark_still_runs_when_no_pad_is_attached(monkeypatch, tmp_path):
+    _use_fake(monkeypatch, {"hello there": "hi"})
+
+    class NoPadDisplay(FakeDisplay):
+        """A display whose one-off probe finds no touchy-pad."""
+
+        def start(self):
+            self.started = True
+            return False
+
+    monkeypatch.setattr(cli, "PadDisplay", NoPadDisplay)
+    matrix = _matrix(tmp_path / "models.toml", [{"model": "m1", "label": "one"}])
+    corpus = _corpus(tmp_path / "overheard.txt", ["hello there"])
+    out = tmp_path / "report.md"
+    result = CliRunner().invoke(
+        cli.main, ["jokemark", "--models", str(matrix), "-f", str(corpus), "-o", str(out)]
+    )
+    assert result.exit_code == 0
+    display = NoPadDisplay.instances[0]
+    assert display.started and display.closed
+    assert display.shown == []  # nothing was ever sent to a pad
+    assert out.exists()

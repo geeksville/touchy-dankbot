@@ -58,10 +58,43 @@ def test_a_coloured_quip_lands_on_the_simulated_panel(sim):
 def test_the_banner_shows_then_an_empty_quip_clears(sim):
     display = PadDisplay(clear_after=0)
     try:
-        display.start()
+        assert display.start() is True  # jokemark probes the pad with this
         assert _label(sim).label.text == STARTUP_TEXT
         display.show([])  # an empty quip blanks the marquee
         assert _label(sim).label.text == ""
+    finally:
+        display.close()
+
+
+def test_jokemark_pushes_each_reply_through_the_pad(sim):
+    """jokemark's optional sink draws the same parsed runs ``listen`` shows."""
+    from voicebot.jokemark import ModelSpec, run_benchmark
+
+    class Backend:
+        def has_model(self, name):
+            return True
+
+        def pull_model(self, name):  # pragma: no cover - nothing is missing
+            raise AssertionError("nothing should be pulled")
+
+        def chat(self, messages):
+            return {
+                "first line": "/color/green Danger!",
+                "second line": "/notfunny",
+            }[messages[-1]["content"]]
+
+    display = PadDisplay(clear_after=0)
+    try:
+        (bank,) = run_benchmark(
+            (ModelSpec(label="fake", model="fake"),),
+            ("first line", "second line"),
+            persona="PERSONA",
+            client_factory=lambda _spec: Backend(),
+            pull=False,
+            display=display.show,
+        )
+        assert [row.reply.skip for row in bank.results] == [False, True]
+        assert _label(sim).label.text == "#00FF00 Danger!#"
     finally:
         display.close()
 
