@@ -1,6 +1,6 @@
 """jokemark — the model bake-off for the quip stage.
 
-Runs every model/parameter set in a JSON matrix against every line of the
+Runs every model/parameter set in a TOML matrix against every line of the
 packaged overheard corpus, pulls whatever the server is missing, and renders one
 Markdown report with a row per line per model.
 
@@ -10,16 +10,18 @@ fake and never pull or chat. Only :mod:`voicebot.cli` wires in the real client.
 
 The corpus and the matrix live in ``voicebot/assets/`` and are read through
 :mod:`importlib.resources`, so an installed wheel behaves exactly like a source
-checkout. See ``docs/plans/jokemark.md``.
+checkout. The matrix is TOML (stdlib :mod:`tomllib`, no dependency) rather than
+JSON so it can carry comments explaining each experiment. See
+``docs/plans/jokemark.md``.
 """
 
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import statistics
 import time
+import tomllib
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -41,7 +43,7 @@ log = logging.getLogger(__name__)
 #: Directory (inside the import package) holding the packaged assets.
 ASSETS = "assets"
 #: The default model/parameter matrix and overheard corpus.
-MATRIX_ASSET = "jokemark-models.json"
+MATRIX_ASSET = "jokemark-models.toml"
 CORPUS_ASSET = "overheard.txt"
 
 #: The only matrix schema version this code understands.
@@ -183,7 +185,7 @@ def _checked_params(
 def load_matrix(
     text: str, *, native: bool = False, timeout: float = DEFAULT_TIMEOUT
 ) -> tuple[ModelSpec, ...]:
-    """Parse and validate a model matrix.
+    """Parse and validate a model matrix (TOML: ``version`` / ``defaults`` / ``models``).
 
     *native* and *timeout* are the CLI-level baseline; a matrix ``defaults``
     object or an individual entry may override either.
@@ -192,11 +194,9 @@ def load_matrix(
     different experiment than the one written down.
     """
     try:
-        data = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise JokemarkError(f"matrix is not valid JSON: {exc}") from exc
-    if not isinstance(data, dict):
-        raise JokemarkError("matrix must be a JSON object with version/defaults/models")
+        data = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as exc:
+        raise JokemarkError(f"matrix is not valid TOML: {exc}") from exc
     unknown = set(data) - {"version", "defaults", "models"}
     if unknown:
         raise JokemarkError(f"unknown matrix keys: {', '.join(sorted(unknown))}")

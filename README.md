@@ -101,7 +101,7 @@ voicebot jokemark
 |---|---|
 | `voicebot reply` | Read overheard lines (`--line` / `-f FILE` / stdin) and print a witty reply for each (`--json` for `{input, reply, skip, model, raw}` per line). Commands are stripped from the printed text, so a `/notfunny` reply prints nothing. |
 | `voicebot models` | List the models the server has pulled. |
-| `voicebot jokemark` | Bake off the quip stage: every model/params in a JSON matrix against the packaged overheard corpus (fetching missing models), writing a Markdown report (default `jokemark.md`). `--dry-run` shows the matrix without touching the network. |
+| `voicebot jokemark` | Bake off the quip stage: every model/params in a TOML matrix against the packaged overheard corpus (fetching missing models), writing a Markdown report (default `jokemark.md`). `--dry-run` shows the matrix without touching the network. |
 | `voicebot listen` | Listen to the mic, transcribe with **Moonshine**, log `HEARD:` / `SKIP(...)` / `REPLY:` per utterance, and scroll each quip on an attached touchy-pad; `--fake FILE` replays a text file instead (no mic, no model). |
 
 Configuration is **flag -> env -> default** — click implements the precedence:
@@ -109,7 +109,7 @@ Configuration is **flag -> env -> default** — click implements the precedence:
 | Setting | Flag | Env | Default |
 |---|---|---|---|
 | Server URL | `--url` | `VOICEBOT_URL` | `https://kai.pygmy-map.ts.net` |
-| Model | `--model` | `VOICEBOT_MODEL` | Human-Like-Mistral-Nemo-12B (Q8_0) |
+| Model | `--model` | `VOICEBOT_MODEL` | Rocinante-X-12B (Q4_K_M) |
 | Persona | `--persona` / `--persona-file` | `VOICEBOT_PERSONA` | the toaster robot |
 | Temperature | `--temperature` | `VOICEBOT_TEMP` | `0.9` |
 | min-p | `--min-p` | `VOICEBOT_MIN_P` | `0.05` |
@@ -117,8 +117,10 @@ Configuration is **flag -> env -> default** — click implements the precedence:
 | Max output tokens | `--max-tokens` | `VOICEBOT_MAX_TOKENS` | `120` |
 | Native `/api/chat` | `--native` | `VOICEBOT_NATIVE` | off (use `/v1`) |
 
-Try the more disciplined 8B model:
-`--model hf.co/NousResearch/Hermes-3-Llama-3.1-8B-GGUF:latest`.
+The default is what won the bake-off. Fallbacks, both already in the matrix:
+`--model hf.co/NousResearch/Hermes-3-Llama-3.1-8B-GGUF:latest` (the disciplined
+8B) or `--model hf.co/bartowski/Human-Like-Mistral-Nemo-Instruct-2407-GGUF:Q8_0`
+(the 12B runner-up).
 
 ## Model bake-off (jokemark)
 
@@ -128,17 +130,18 @@ time:
 ```sh
 just jokemark                    # or: voicebot jokemark
 voicebot jokemark --dry-run      # print the resolved matrix + line count
-voicebot jokemark --models mine.json -o report.md --no-pull
+voicebot jokemark --models mine.toml -o report.md --no-pull
 ```
 
 * **Corpus:** `src/voicebot/assets/overheard.txt` — the six
   `sim-overheard.txt` smoke lines plus restaurant/dinner-party conversation,
   shipped in the package and read with `importlib.resources`.
-* **Matrix:** `src/voicebot/assets/jokemark-models.json` — model paths plus
+* **Matrix:** `src/voicebot/assets/jokemark-models.toml` — model paths plus
   optional `label`, `temperature`, `min_p`, `ctx`, `max_tokens`, `native` and
-  `timeout`. `defaults` apply to every row; a row overrides them. Add a
-  candidate model there (or in your own `--models` file) to put it in the
-  bake-off.
+  `timeout`. TOML, so the file can carry comments about each experiment.
+  `[defaults]` applies to every row; a row overrides it. Add a candidate model
+  there (or in your own `--models` file) to put it in the bake-off; comment an
+  entry out to retire it, leaving the verdict beside it.
 * **Fetching:** missing models are pulled via Ollama's `/api/pull` first
   (`--no-pull` records them as errors instead).
 * **Report:** one Markdown file with a summary table (replies / skips / errors /

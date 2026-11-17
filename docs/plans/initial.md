@@ -299,6 +299,9 @@ below.
   `NOTFUNNY`); the funnier-but-more-erratic Human-Like Mistral Nemo (12B, Q8_0)
   is one `--model …` away. Both are already pulled. Revisit if Nemo is ever
   tuned to respect `NOTFUNNY`.
+  *Superseded (2026-11-17):* the jokemark bake-off moved the default to
+  **Rocinante-X 12B (Q4_K_M)** — see [`jokemark.md`](jokemark.md); Hermes-3-8B
+  and Nemo remain the fallbacks.
 * **Server availability / auth.** The endpoint is open over Tailscale today; if
   it grows auth or a different hostname, `--url`/`VOICEBOT_URL` absorb it, but
   there is no key handling yet. *Need: whether an API key is ever expected.*

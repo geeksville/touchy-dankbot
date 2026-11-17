@@ -229,7 +229,15 @@ def _all_output(result) -> str:
 
 
 def _matrix(path, models):
-    path.write_text(json.dumps({"version": 1, "models": models}), encoding="utf-8")
+    """A minimal TOML matrix (`version` + one `[[models]]` table per entry)."""
+    out = ["version = 1"]
+    for model in models:
+        out.append("[[models]]")
+        out += [
+            f"{key} = {json.dumps(value) if isinstance(value, str) else value}"
+            for key, value in model.items()
+        ]
+    path.write_text("\n".join(out) + "\n", encoding="utf-8")
     return path
 
 
@@ -241,7 +249,7 @@ def _corpus(path, lines):
 def test_jokemark_dry_run_prints_the_matrix(monkeypatch, tmp_path):
     _use_fake(monkeypatch)
     matrix = _matrix(
-        tmp_path / "models.json",
+        tmp_path / "models.toml",
         [
             {"model": "m1", "label": "one"},
             {"model": "m2", "label": "two", "temperature": 0.0},
@@ -264,7 +272,7 @@ def test_jokemark_writes_a_report_and_pulls_only_the_missing_model(monkeypatch, 
     _use_fake(monkeypatch, {"hello there": "hi", "bye now": "/notfunny"})
     FakeClient.available = {"m1"}
     matrix = _matrix(
-        tmp_path / "models.json",
+        tmp_path / "models.toml",
         [{"model": "m1", "label": "one"}, {"model": "m2", "label": "two"}],
     )
     corpus = _corpus(tmp_path / "overheard.txt", ["hello there", "bye now"])
@@ -284,7 +292,7 @@ def test_jokemark_writes_a_report_and_pulls_only_the_missing_model(monkeypatch, 
 def test_jokemark_no_pull_records_the_missing_model(monkeypatch, tmp_path):
     _use_fake(monkeypatch)
     FakeClient.available = set()
-    matrix = _matrix(tmp_path / "models.json", [{"model": "m1", "label": "one"}])
+    matrix = _matrix(tmp_path / "models.toml", [{"model": "m1", "label": "one"}])
     corpus = _corpus(tmp_path / "overheard.txt", ["hello there"])
     out = tmp_path / "report.md"
     result = CliRunner().invoke(
@@ -298,8 +306,8 @@ def test_jokemark_no_pull_records_the_missing_model(monkeypatch, tmp_path):
 
 def test_jokemark_rejects_a_bad_matrix(monkeypatch, tmp_path):
     _use_fake(monkeypatch)
-    matrix = tmp_path / "models.json"
-    matrix.write_text("{}", encoding="utf-8")
+    matrix = tmp_path / "models.toml"
+    matrix.write_text("version = 1\n", encoding="utf-8")
     corpus = _corpus(tmp_path / "overheard.txt", ["hello there"])
     result = CliRunner().invoke(
         cli.main,

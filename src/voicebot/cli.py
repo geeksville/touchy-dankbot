@@ -5,7 +5,7 @@ Four commands:
 * ``voicebot reply`` — read overheard lines (``--line`` / ``-f FILE`` / stdin)
   and print a witty reply for each (commands stripped; ``/notfunny`` suppresses).
 * ``voicebot models`` — list the models the server has pulled.
-* ``voicebot jokemark`` — the model bake-off: every model/params in a JSON
+* ``voicebot jokemark`` — the model bake-off: every model/params in a TOML
   matrix against the packaged overheard corpus, rendered to Markdown.
 * ``voicebot listen`` — mic → Moonshine → gate → reply, scrolled on the pad.
 
@@ -411,7 +411,7 @@ def models(url: str, native: bool, timeout: float) -> None:
     "models_file",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     default=None,
-    help="JSON model matrix (default: the packaged jokemark-models.json).",
+    help="TOML model matrix (default: the packaged jokemark-models.toml).",
 )
 @click.option(
     "-f",

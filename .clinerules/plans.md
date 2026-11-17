@@ -26,7 +26,7 @@ tracked in git.
 - `docs/plans/standalone.md` — extracting voicebot to its own repo (packaging,
   PyPI name, CI, devcontainer).
 - `docs/plans/jokemark.md` — the model bake-off (`voicebot jokemark`): packaged
-  overheard corpus × JSON model matrix → one Markdown report.
+  overheard corpus × TOML model matrix → one Markdown report.
 
 Docs that are *not* plans: `docs/TODO.md` (loose backlog), `docs/hardware.md`
 (hardware notes), `docs/responder.md` / `docs/transcribe.md` (research notes).

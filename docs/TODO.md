@@ -1,7 +1,7 @@
 misc
 * fix scrolling rate - done: touchy-pad LB19 `scroll_speed_px_s`, voicebot scrolls at 20 px/s (`DEFAULT_SCROLL_SPEED_PX_S`)
 * do touchy release
-* use funnier model
+* use funnier model - done: `DEFAULT_MODEL` is Rocinante-X 12B Q4_K_M (jokemark pick)
 * use colors
 * add ai usage to readme
 

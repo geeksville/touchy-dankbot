@@ -11,7 +11,7 @@ voicebot reply -f sim-overheard.txt --model B | tee b.txt
 ```
 
 with one command that runs a **packaged, restaurant/dinner-party corpus**
-against a **JSON model matrix**, pulls whatever the server is missing, and
+against a **TOML model matrix**, pulls whatever the server is missing, and
 writes a **single Markdown report** with one section per model/parameter set.
 It exercises only the responder (persona → prompt → reply → `/command` parse);
 the mic, gate and display are deliberately not involved.
@@ -20,7 +20,7 @@ the mic, gate and display are deliberately not involved.
 >
 > * **Assets** — `src/voicebot/assets/overheard.txt` (36 unique lines: the six
 >   `sim-overheard.txt` smoke lines verbatim + 30 restaurant/dinner-party lines)
->   and `src/voicebot/assets/jokemark-models.json` (Hermes-3 8B + Human-Like
+>   and `src/voicebot/assets/jokemark-models.toml` (Hermes-3 8B + Human-Like
 >   Mistral Nemo 12B, each at the default sampler and with a temperature
 >   variant). `pyproject.toml` includes `src/voicebot/assets`; `just build` was
 >   verified — both the wheel and the sdist contain the two files.
@@ -39,7 +39,19 @@ the mic, gate and display are deliberately not involved.
 > * **Matrix update (2026-11-17)** — added four newer candidates at `Q4_K_M`
 >   (TheDrummer Rocinante-X 12B, a Gemma 3 4B comedy fine-tune, Gemma 4 12B,
 >   and a Qwen3.5 9B Claude-merge) so each fits a 16GB Raspberry Pi 5; the
->   existing entries and the 0.85 benchmark baseline are unchanged.
+>   existing entries and the 0.85 benchmark baseline are unchanged. Of those
+>   four only Rocinante survived the ear test — the other three are retired in
+>   place (commented-out `[[models]]` blocks with a verdict), not deleted.
+> * **Matrix format (2026-11-17)** — `jokemark-models.json` became
+>   `jokemark-models.toml`: the matrix is meant to be hand-edited, and comments
+>   beat a JSON file that cannot explain itself. `tomllib` is stdlib on the
+>   project's 3.11 floor, so this cost no dependency (PyYAML would have); the
+>   shape is unchanged (`version`, `[defaults]`, repeated `[[models]]` tables).
+> * **Default model (2026-11-17)** — `DEFAULT_MODEL` is now
+>   `hf.co/TheDrummer/Rocinante-X-12B-v1-GGUF:Q4_K_M` (the funniest entry in the
+>   bake-off, and Q4_K_M keeps it Pi-sized). Hermes-3 8B stays in the matrix as
+>   the disciplined baseline and Human-Like Nemo Q8_0 as the 12B runner-up; the
+>   packaged matrix is asserted to contain the default.
 >
 > `just lint` clean; `just test` **161 passed / 2 skipped**. Live checks
 > (2026-11-17): `/api/pull` accepted `"model"` and returned
@@ -61,7 +73,7 @@ the mic, gate and display are deliberately not involved.
 1. read a longer **overheard corpus** shipped inside the package
    (`voicebot/assets/overheard.txt`) — the six current `sim-overheard.txt`
    lines plus ~30 typical restaurant / dinner-party lines;
-2. read a **model matrix** from JSON (`voicebot/assets/jokemark-models.json`),
+2. read a **model matrix** from TOML (`voicebot/assets/jokemark-models.toml`),
    so a model entry can carry sampler parameters, not just a name;
 3. iterate the matrix, **pulling** each model through Ollama's `/api/pull` when
    the server does not already have it;
@@ -95,7 +107,7 @@ Keep the same shape as the rest of the CLI: a **pure core module** (`jokemark.py
 `Responder` unchanged (so the persona and `/command` parsing are exactly what
 `reply`/`listen` use), adds two native-API methods to `ChatClient` for the
 Ollama pull, and renders the collected `Reply` objects to Markdown. Assets are
-ordinary text/JSON inside the import package, read with `importlib.resources`
+ordinary text/TOML inside the import package, read with `importlib.resources`
 so an installed wheel behaves like a checkout.
 
 ## The CLI
@@ -108,7 +120,7 @@ owns those.
 ```
 voicebot jokemark [OPTIONS]
 
-  --models FILE        JSON matrix (default: packaged jokemark-models.json)
+  --models FILE        TOML matrix (default: packaged jokemark-models.toml)
   -f, --lines FILE     overheard corpus (default: packaged overheard.txt)
   -o, --out FILE       Markdown report (default: ./jokemark.md)
   --url URL            Ollama server (default: $VOICEBOT_URL / DEFAULT_URL)
@@ -123,7 +135,7 @@ voicebot jokemark [OPTIONS]
 
 Rationale:
 
-* **`--dry-run`** validates a hand-edited JSON/corpus without touching the
+* **`--dry-run`** validates a hand-edited TOML/corpus without touching the
   network — it is also how the CLI test asserts the matrix was parsed.
 * **`--limit`** keeps iteration (and a live smoke test) cheap.
 * **`--no-pull`** is the offline / “server is already warm” switch; with it a
@@ -145,8 +157,8 @@ as `reply` and `listen`.
 
 ```
 src/voicebot/assets/
-├── overheard.txt          # 6 existing lines + ~30 restaurant/dinner-party lines
-└── jokemark-models.json   # the model/parameter matrix
+├── overheard.txt            # 6 existing lines + ~30 restaurant/dinner-party lines
+└── jokemark-models.toml     # the model/parameter matrix (comments welcome)
 ```
 
 They live *inside* the import package so they ship in the wheel and are found
@@ -190,43 +202,51 @@ Rules for the ~30 new lines:
 `README.md`, `just reply` and `just listen --fake`; a test asserts every line
 in it still appears in the packaged corpus, so the two cannot drift.
 
-### The model matrix (`jokemark-models.json`)
+### The model matrix (`jokemark-models.toml`)
 
-An envelope object rather than a bare list, so shared defaults and future
-matrix axes (personas, repeats, seeds) have somewhere to go:
+An envelope document rather than a bare list, so shared defaults and future
+matrix axes (personas, repeats, seeds) have somewhere to go. TOML specifically,
+because this file is edited by hand and each experiment deserves a comment
+(why this quant, what this variant is probing). `tomllib` is stdlib from 3.11,
+so it needs no dependency — unlike YAML, which would pull in PyYAML.
 
-```json
-{
-  "version": 1,
-  "defaults": { "temperature": 0.85, "min_p": 0.05, "ctx": 4096, "max_tokens": 120 },
-  "models": [
-    {
-      "model": "hf.co/NousResearch/Hermes-3-Llama-3.1-8B-GGUF:latest",
-      "label": "hermes-3-8b"
-    },
-    {
-      "model": "hf.co/bartowski/Human-Like-Mistral-Nemo-Instruct-2407-GGUF:Q8_0",
-      "label": "human-like-nemo-12b"
-    },
-    {
-      "model": "hf.co/NousResearch/Hermes-3-Llama-3.1-8B-GGUF:latest",
-      "label": "hermes-3-8b t=0.0",
-      "temperature": 0.0
-    },
-    {
-      "model": "hf.co/bartowski/Human-Like-Mistral-Nemo-Instruct-2407-GGUF:Q8_0",
-      "label": "human-like-nemo-12b t=1.0",
-      "temperature": 1.0
-    }
-  ]
-}
+```toml
+# Per-entry keys: model, label, temperature, min_p, ctx, max_tokens, native, timeout.
+version = 1
+
+[defaults]
+temperature = 0.85
+min_p = 0.05
+ctx = 4096
+max_tokens = 120
+
+# The disciplined baseline.
+[[models]]
+model = "hf.co/NousResearch/Hermes-3-Llama-3.1-8B-GGUF:latest"
+label = "hermes-3-8b"
+
+[[models]]
+model = "hf.co/bartowski/Human-Like-Mistral-Nemo-Instruct-2407-GGUF:Q8_0"
+label = "human-like-nemo-12b"
+
+# Near-greedy: consistent, but repeats itself.
+[[models]]
+model = "hf.co/NousResearch/Hermes-3-Llama-3.1-8B-GGUF:latest"
+label = "hermes-3-8b t=0.0"
+temperature = 0.0
+
+[[models]]
+model = "hf.co/bartowski/Human-Like-Mistral-Nemo-Instruct-2407-GGUF:Q8_0"
+label = "human-like-nemo-12b t=1.0"
+temperature = 1.0
 ```
 
-* The first two entries are the models already being evaluated today (Hermes-3
-  8B is `DEFAULT_MODEL`; Human-Like Mistral Nemo Q8_0 is the
-  funnier-but-more-erratic alternative documented in `initial.md`). The two
-  `t=` variants exist to exercise the parameter axis and to answer the sampler
-  question with evidence rather than feel.
+* The first two entries are the models that were being evaluated by hand when
+  the bake-off was written up (Hermes-3 8B was `DEFAULT_MODEL` then;
+  Human-Like Mistral Nemo Q8_0 was the funnier-but-more-erratic alternative
+  documented in `initial.md`). The two `t=` variants exist to exercise the
+  parameter axis and to answer the sampler question with evidence rather than
+  feel.
 * **Per-entry keys:** `model` (required), `label` (optional, must be unique),
   `temperature`, `min_p`, `ctx`, `max_tokens`, `native`, `timeout`.
   Missing sampler values come from `defaults`, then from
@@ -241,7 +261,7 @@ matrix axes (personas, repeats, seeds) have somewhere to go:
   offending entry named.
 * `--models` accepts a hand-written file; the packaged one is only the default.
   That is the intended way to try a new candidate model: add one entry, run
-  `jokemark --models mine.json`, compare against the baseline report.
+  `jokemark --models mine.toml`, compare against the baseline report.
 
 ## Fetching models
 
@@ -275,7 +295,7 @@ def pull_model(self, name: str, *, timeout: float = DEFAULT_PULL_TIMEOUT) -> Non
 ## The run loop
 
 ```
-for spec in matrix:                      # JSON order, one model loaded at a time
+for spec in matrix:                      # matrix order, one model loaded at a time
     if pull and not client.has_model(spec.model): client.pull_model(...)
     for i, line in enumerate(lines, 1):  # corpus order
         reply = responder.respond(line)  # persona fixed for the whole run
@@ -358,7 +378,7 @@ min_p 0.05, ctx 4096, max_tokens 120, native off
 | File | Change |
 |---|---|
 | `src/voicebot/assets/overheard.txt` | **new** — 6 old lines + ~30 restaurant/dinner-party lines. |
-| `src/voicebot/assets/jokemark-models.json` | **new** — the matrix above. |
+| `src/voicebot/assets/jokemark-models.toml` | **new** — the matrix above. |
 | `src/voicebot/jokemark.py` | **new** — `ModelSpec`, `load_matrix`, `load_lines`, `run_benchmark`, `render_markdown`. Pure, network-free, no click. |
 | `src/voicebot/server.py` | add `has_model` + `pull_model` (+ the pull timeout argument). |
 | `src/voicebot/config.py` | add `DEFAULT_PULL_TIMEOUT`. |
@@ -416,7 +436,7 @@ in `test_cli.py`, so tests never pull or chat for real.
 
 | Phase | Work | Acceptance |
 |---|---|---|
-| **P1 — assets** | Write `overheard.txt` (6 + ~30 unique restaurant/dinner-party lines) and `jokemark-models.json` (2 models + 2 sampler variants); add the `pyproject.toml` include. | `python -c` reads both via `importlib.resources`; `just build` + `unzip -l dist/touchy_voicebot-*.whl` shows both files; asset tests green. |
+| **P1 — assets** | Write `overheard.txt` (6 + ~30 unique restaurant/dinner-party lines) and `jokemark-models.toml` (2 models + 2 sampler variants); add the `pyproject.toml` include. | `python -c` reads both via `importlib.resources`; `just build` + `unzip -l dist/touchy_voicebot-*.whl` shows both files; asset tests green. |
 | **P2 — fetch primitives** | `DEFAULT_PULL_TIMEOUT`, `ChatClient.has_model` / `pull_model`, `tests/test_server.py`. | Unit tests prove the `/api/pull` payload, `:latest` matching, and `VoicebotError` normalisation; live check pulls an already-present model (fast no-op). |
 | **P3 — jokemark core** | `jokemark.py` (loaders + validation, runner with the error policy, Markdown renderer) and `tests/test_jokemark.py` with a recording fake client. | All tests network-free; renderer output contains one summary row per spec, stable row numbers, skip/error markers, and escaped `|`/newlines. |
 | **P4 — CLI + docs** | `voicebot jokemark` wiring, `just jokemark`, README/AGENTS updates, CLI tests (`--dry-run`, `--no-pull`, `--limit`, `-o`). | `just lint` clean; `just test` green; `voicebot jokemark --dry-run` prints 4 specs × 36 lines and writes nothing. |
@@ -442,8 +462,9 @@ downloads models).
   commands visible, skip marker present, `|` and newlines escaped, error block
   rendered.
 * Assets: `overheard.txt` has ≥ 36 non-blank unique lines, the first six equal
-  `sim-overheard.txt` verbatim, every `sim-overheard.txt` line is present, and
-  the JSON parses to the two documented model paths.
+  `sim-overheard.txt` verbatim, every `sim-overheard.txt` line is present, the
+  TOML parses, it covers `DEFAULT_MODEL`, and it still documents every tried
+  candidate (retired ones live on as commented-out entries).
 * CLI (`CliRunner`, `isolated_filesystem`, monkeypatched `ChatClient`):
   default run writes `jokemark.md` and pulls only the absent model;
   `--no-pull` never calls `pull_model`; `--dry-run` writes nothing;
@@ -466,13 +487,13 @@ next default model without consulting shell history.
 | Command shape | a `jokemark` **subcommand** | One command per stage, like `reply` / `models` / `listen`; the matrix owns model/sampler options, so inheriting `_LLM_OPTIONS` would be misleading. |
 | Corpus location | packaged `src/voicebot/assets/` | Works from a wheel on the Pi, not just from a source checkout; `importlib.resources` avoids `__file__` path games. |
 | Corpus size/shape | ~36 bare, unique, lowercase utterances | Enough to expose `/notfunny` and formatting failures; bare utterances match what STT actually produces. |
-| Matrix format | JSON envelope (`version`/`defaults`/`models`) | Parameters per row without a CLI flag explosion; room for personas/repeats/seeds later. |
+| Matrix format | TOML envelope (`version`/`[defaults]`/`[[models]]`) | Parameters per row without a CLI flag explosion; room for personas/repeats/seeds later. TOML (stdlib `tomllib`) over JSON so the hand-edited file can carry comments, and over YAML so no dependency is added. |
 | Initial entries | Hermes-3 8B + Human-Like Nemo 12B, each at the default sampler and one temperature variant | Exactly what has been evaluated by hand, plus an A/B that exercises the parameter axis. |
 | Pull default | on, `stream: false`, 1 h timeout | “fetch if needed” is the request; a cold 13 GB fetch must not hit the 120 s chat timeout. |
 | Failure policy | abort the failing model's bank, continue the run | Keeps a down server / bad model from costing 36 timeouts, without losing the other models. |
 | Output | one Markdown file, fixed default name | Directly readable/diffable and attachable; no presentation layer in the CLI beyond writing it. |
 | Sampling | one sample per line, no seed | It is a vibe check (“jokemark”), not a statistically rigorous benchmark; repeats are deferred. |
-| Dependencies | none new — stdlib `json` / `importlib.resources` / `dataclasses` / `hashlib` + existing `click` / `requests` / `openai` | Keeps the Pi install and the wheel small; `requests` already backs the native `/api/chat` path. |
+| Dependencies | none new — stdlib `tomllib` / `importlib.resources` / `dataclasses` / `hashlib` + existing `click` / `requests` / `openai` | Keeps the Pi install and the wheel small; `requests` already backs the native `/api/chat` path. |
 
 ## Deferred (explicitly not in this pass)
 

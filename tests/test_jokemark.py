@@ -16,6 +16,7 @@ from voicebot.config import (
     DEFAULT_CTX,
     DEFAULT_MAX_TOKENS,
     DEFAULT_MIN_P,
+    DEFAULT_MODEL,
     DEFAULT_TEMPERATURE,
     DEFAULT_TIMEOUT,
 )
@@ -35,10 +36,26 @@ from voicebot.server import VoicebotError
 FIXED_NOW = datetime(2026, 11, 17, 21, 4, tzinfo=UTC)
 
 
-def _matrix(*models: dict, **extra) -> str:
-    data = {"version": 1, "models": list(models)}
-    data.update(extra)
-    return json.dumps(data)
+def _toml_value(value: object) -> str:
+    """A scalar as TOML (JSON string quoting is valid TOML for what we write)."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, str):
+        return json.dumps(value)
+    return repr(value)
+
+
+def _matrix(*models: dict, defaults: dict | None = None, version: int = 1, **top: object) -> str:
+    """A model matrix in TOML — *top* becomes root keys, *defaults* its table."""
+    out = [f"version = {_toml_value(version)}"]
+    out += [f"{key} = {_toml_value(value)}" for key, value in top.items()]
+    if defaults:
+        out.append("[defaults]")
+        out += [f"{key} = {_toml_value(value)}" for key, value in defaults.items()]
+    for entry in models:
+        out.append("[[models]]")
+        out += [f"{key} = {_toml_value(value)}" for key, value in entry.items()]
+    return "\n".join(out) + "\n"
 
 
 def _reply(text: str = "quip", *, skip: bool = False, raw: str | None = None) -> Reply:
@@ -96,12 +113,9 @@ def test_matrix_defaults_fill_in_the_sampler():
 
 
 def test_matrix_defaults_and_the_cli_baseline_are_merged():
-    text = json.dumps(
-        {
-            "version": 1,
-            "defaults": {"temperature": 0.5, "native": True},
-            "models": [{"model": "m", "label": "x"}],
-        }
+    text = _matrix(
+        {"model": "m", "label": "x"},
+        defaults={"temperature": 0.5, "native": True},
     )
     spec = load_matrix(text, native=False, timeout=30)[0]
     assert spec.temperature == 0.5
@@ -110,14 +124,9 @@ def test_matrix_defaults_and_the_cli_baseline_are_merged():
 
 
 def test_an_entry_overrides_the_defaults():
-    text = json.dumps(
-        {
-            "version": 1,
-            "defaults": {"temperature": 0.5},
-            "models": [
-                {"model": "m", "label": "x", "temperature": 0, "native": False, "timeout": 5}
-            ],
-        }
+    text = _matrix(
+        {"model": "m", "label": "x", "temperature": 0, "native": False, "timeout": 5},
+        defaults={"temperature": 0.5},
     )
     spec = load_matrix(text, native=True)[0]
     assert spec.temperature == 0.0
@@ -126,31 +135,32 @@ def test_an_entry_overrides_the_defaults():
 
 
 @pytest.mark.parametrize(
-    ("data", "match"),
+    ("text", "match"),
     [
-        ({"version": 1, "models": []}, "non-empty"),
-        ({"version": 2, "models": [{"model": "m"}]}, "unsupported"),
-        ({"version": 1, "wat": 1, "models": [{"model": "m"}]}, "unknown matrix keys"),
-        ({"version": 1, "models": [{"model": ""}]}, "non-empty string"),
-        ({"version": 1, "models": [{"model": "m", "temp": 0.5}]}, "unknown keys"),
-        ({"version": 1, "models": [{"model": "m"}, {"model": "m"}]}, "duplicate label"),
-        ({"version": 1, "models": [{"model": "m", "temperature": -1}]}, "negative"),
-        ({"version": 1, "models": [{"model": "m", "min_p": 2}]}, "between 0 and 1"),
-        ({"version": 1, "models": [{"model": "m", "ctx": 0}]}, "positive"),
-        ({"version": 1, "models": [{"model": "m", "max_tokens": 0}]}, "positive"),
-        ({"version": 1, "models": [{"model": "m", "native": "yes"}]}, "true or false"),
+        (_matrix(), "non-empty"),
+        (_matrix({"model": "m"}, version=2), "unsupported"),
+        (_matrix({"model": "m"}, wat=1), "unknown matrix keys"),
+        (_matrix({"model": ""}), "non-empty string"),
+        (_matrix({"model": "m", "temp": 0.5}), "unknown keys"),
+        (_matrix({"model": "m"}, {"model": "m"}), "duplicate label"),
+        (_matrix({"model": "m", "temperature": -1}), "negative"),
+        (_matrix({"model": "m", "min_p": 2}), "between 0 and 1"),
+        (_matrix({"model": "m", "ctx": 0}), "positive"),
+        (_matrix({"model": "m", "max_tokens": 0}), "positive"),
+        (_matrix({"model": "m", "native": "yes"}), "true or false"),
+        (_matrix({"model": "m"}, defaults={"wat": 1}), "unknown keys"),
     ],
 )
-def test_matrix_validation_is_loud(data, match):
+def test_matrix_validation_is_loud(text, match):
     with pytest.raises(JokemarkError, match=match):
-        load_matrix(json.dumps(data))
+        load_matrix(text)
 
 
-def test_not_json_and_not_an_object_are_rejected():
-    with pytest.raises(JokemarkError, match="not valid JSON"):
+def test_invalid_toml_is_rejected():
+    with pytest.raises(JokemarkError, match="not valid TOML"):
+        load_matrix("version = = 1")
+    with pytest.raises(JokemarkError, match="not valid TOML"):
         load_matrix("{nope")
-    with pytest.raises(JokemarkError, match="JSON object"):
-        load_matrix("[]")
 
 
 # -- the corpus ---------------------------------------------------------------
@@ -187,18 +197,25 @@ def test_the_packaged_matrix_keeps_the_previously_evaluated_models():
     assert any(spec.temperature == 0.0 for spec in specs)
 
 
-def test_the_packaged_matrix_adds_smaller_untried_candidates():
-    specs = load_matrix(jokemark.packaged_text(jokemark.MATRIX_ASSET))
-    models = {spec.model for spec in specs}
+def test_the_packaged_matrix_still_documents_every_tried_candidate():
+    # A candidate that scored badly stays in the file as a commented-out
+    # `[[models]]` block with a verdict next to it, so assert on the raw text:
+    # retiring a model must not erase the record of having tried it.
+    text = jokemark.packaged_text(jokemark.MATRIX_ASSET)
     for repo in (
         "TheDrummer/Rocinante-X-12B-v1-GGUF",
         "mradermacher/gemma3-4b-it-comedy-v2-GGUF",
         "unsloth/gemma-4-12b-it-GGUF",
         "mradermacher/Qwen3.5-9B-Claude-3xMerge-UNCENSORED-heretic-i1-GGUF",
     ):
-        assert any(repo in model for model in models)
-    # All four new candidates are Q4_K_M — the quant that fits a 16 GB Pi 5.
-    assert len([spec for spec in specs if "Q4_K_M" in spec.model]) == 4
+        assert repo in text
+
+
+def test_the_packaged_matrix_covers_the_default_model():
+    # The default must stay a bake-off candidate, so changing one without the
+    # other (or a typo in the model path) is caught here.
+    specs = load_matrix(jokemark.packaged_text(jokemark.MATRIX_ASSET))
+    assert DEFAULT_MODEL in {spec.model for spec in specs}
 
 
 # -- the run loop -------------------------------------------------------------

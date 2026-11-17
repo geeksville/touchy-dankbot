@@ -27,7 +27,7 @@ of the **creep3r** art project. This repo is standalone: it depends on the
 | `src/voicebot/display.py` | The **only** module that imports `touchy_pad` (the display stage: LED marquee or LCD text field). |
 | `src/voicebot/logs.py` | Terminal logging (rich): `HEARD` / `SKIP` / `REPLY` in colour, quips in their display colours. |
 | `src/voicebot/config.py` | Defaults + the `Settings` value objects. |
-| `src/voicebot/assets/` | Packaged jokemark data: `overheard.txt` + `jokemark-models.json` (read via `importlib.resources`). |
+| `src/voicebot/assets/` | Packaged jokemark data: `overheard.txt` + `jokemark-models.toml` (read via `importlib.resources`). |
 | `tests/` | pytest (network-free; audio + touchy-pad are faked). |
 | `docs/` | `plans/` (design), `hardware.md`, `TODO.md`. |
 | `justfile` | All dev tasks — prefer `just <recipe>`. |

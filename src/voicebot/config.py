@@ -17,14 +17,16 @@ from dataclasses import dataclass
 #: The remote Ollama server (Tailscale; verified 2026-11-04, Ollama 0.40.14).
 DEFAULT_URL = "https://kai.pygmy-map.ts.net"
 
-#: Model default. Human-Like Mistral Nemo (12B, Q8_0) is the current pick after
-#: the jokemark bake-off: funnier than Hermes, though more erratic. Hermes-3-8B
-#: remains the disciplined fallback:
+#: Model default. Rocinante-X 12B (Q4_K_M) is the current pick after the
+#: jokemark bake-off: the funniest of the batch and small enough (Q4_K_M) for
+#: the Pi. Human-Like Mistral Nemo (12B, Q8_0) is the runner-up and Hermes-3-8B
+#: the disciplined fallback:
+#: ``--model hf.co/bartowski/Human-Like-Mistral-Nemo-Instruct-2407-GGUF:Q8_0`` /
 #: ``--model hf.co/NousResearch/Hermes-3-Llama-3.1-8B-GGUF:latest``.
-DEFAULT_MODEL = "hf.co/bartowski/Human-Like-Mistral-Nemo-Instruct-2407-GGUF:Q8_0"
+DEFAULT_MODEL = "hf.co/TheDrummer/Rocinante-X-12B-v1-GGUF:Q4_K_M"
 
 #: Loosened sampler — the launch-funny.sh lesson: wit needs creative word choice.
-#: 0.9 suits the Nemo default (see ``jokemark.md`` for the bake-off).
+#: 0.9 suits the 12B picks (see ``jokemark.md`` for the bake-off).
 DEFAULT_TEMPERATURE = 0.9
 DEFAULT_MIN_P = 0.05
 DEFAULT_CTX = 4096
