@@ -36,6 +36,10 @@ the mic, gate and display are deliberately not involved.
 >   `--persona`, `--persona-file`, `--dry-run`; `just jokemark`.
 > * **Docs** — README "Model bake-off (jokemark)", AGENTS layout/commands,
 >   `.clinerules/plans.md` index; `jokemark.md` gitignored as an artifact.
+> * **Matrix update (2026-11-17)** — added four newer candidates at `Q4_K_M`
+>   (TheDrummer Rocinante-X 12B, a Gemma 3 4B comedy fine-tune, Gemma 4 12B,
+>   and a Qwen3.5 9B Claude-merge) so each fits a 16GB Raspberry Pi 5; the
+>   existing entries and the 0.85 benchmark baseline are unchanged.
 >
 > `just lint` clean; `just test` **161 passed / 2 skipped**. Live checks
 > (2026-11-17): `/api/pull` accepted `"model"` and returned

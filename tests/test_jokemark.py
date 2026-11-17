@@ -179,13 +179,26 @@ def test_the_packaged_corpus_extends_the_smoke_file():
     assert all(line == line.lower() for line in corpus)
 
 
-def test_the_packaged_matrix_is_the_previously_evaluated_models():
+def test_the_packaged_matrix_keeps_the_previously_evaluated_models():
     specs = load_matrix(jokemark.packaged_text(jokemark.MATRIX_ASSET))
     models = {spec.model for spec in specs}
-    assert len(models) == 2
     assert any("Hermes-3-Llama-3.1-8B" in model for model in models)
     assert any("Human-Like-Mistral-Nemo" in model for model in models)
     assert any(spec.temperature == 0.0 for spec in specs)
+
+
+def test_the_packaged_matrix_adds_smaller_untried_candidates():
+    specs = load_matrix(jokemark.packaged_text(jokemark.MATRIX_ASSET))
+    models = {spec.model for spec in specs}
+    for repo in (
+        "TheDrummer/Rocinante-X-12B-v1-GGUF",
+        "mradermacher/gemma3-4b-it-comedy-v2-GGUF",
+        "unsloth/gemma-4-12b-it-GGUF",
+        "mradermacher/Qwen3.5-9B-Claude-3xMerge-UNCENSORED-heretic-i1-GGUF",
+    ):
+        assert any(repo in model for model in models)
+    # All four new candidates are Q4_K_M — the quant that fits a 16 GB Pi 5.
+    assert len([spec for spec in specs if "Q4_K_M" in spec.model]) == 4
 
 
 # -- the run loop -------------------------------------------------------------
