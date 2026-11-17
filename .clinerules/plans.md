@@ -21,6 +21,8 @@ tracked in git.
 - `docs/plans/initial.md` — the original voicebot plan (the responder CLI).
 - `docs/plans/audioin.md` — the audio-in stage (mic → Moonshine → gate → reply).
 - `docs/plans/ledout.md` — the LED-out stage (scroll quips on a touchy-pad).
+- `docs/plans/lcdout.md` — LCD out: tall panels wrap the quip in a multiline
+  text field; `<= 32`-px-tall panels keep the scrolling marquee.
 - `docs/plans/standalone.md` — extracting voicebot to its own repo (packaging,
   PyPI name, CI, devcontainer).
 

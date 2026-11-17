@@ -82,3 +82,15 @@ class AudioSettings:
     min_words: int = DEFAULT_MIN_WORDS
     min_duration_s: float = DEFAULT_MIN_DURATION_S
     debounce_s: float = DEFAULT_DEBOUNCE_S
+
+
+# ---------------------------------------------------------------------------
+# Display out (the "LED out" / "LCD out" stage) — see docs/plans/ledout.md and
+# docs/plans/lcdout.md
+# ---------------------------------------------------------------------------
+
+#: Which layout to build on the pad: ``auto`` picks by panel height
+#: (``<= 32`` px scrolls a one-line marquee, taller wraps in a text field);
+#: ``scroll`` / ``multiline`` force one. Lives here so the CLI's default follows
+#: the same flag → env → default convention as everything else.
+DEFAULT_DISPLAY_MODE = "auto"

@@ -1,20 +1,24 @@
-"""LED out: scroll the quip on a touchy-pad (stage 3).
+"""Display out: show the quip on a touchy-pad (stage 3).
 
-This is the **only** module that imports ``touchy_pad`` (see
-``docs/plans/ledout.md``), so pulling voicebot out to its own repo stays a
-one-file diff plus the PyPI switch — and the import is *lazy* (inside the
-functions that need it) so the module can be imported and unit-tested without the
-parent repo installed.
+Two layouts, picked from the panel height (``docs/plans/lcdout.md``):
 
-Shape:
+* a ``<= 32``-px-tall panel gets a full-panel **scrolling marquee** — the LED
+  matrix layout (``docs/plans/ledout.md``);
+* a taller panel gets one **multiline text field** that wraps to the panel width
+  and ellipsizes when it runs out of vertical room — the LCD layout.
 
-* one full-panel scrolling-label screen is built once per connection and saved;
-* every quip afterwards is a single ``SetPropertiesCmd`` batch — the label's
-  ``text``, carrying LVGL inline-recolour markup — never a screen re-upload;
-* a pad is opened **lazily**, only when there is something to show, so a pad
-  plugged in later is picked up on the next message and a missing one is never
-  fatal;
-* an idle timer blanks the marquee after ``clear_after`` seconds of quiet.
+Both screens are built once per connection and saved; every quip afterwards is a
+single ``SetPropertiesCmd`` batch — the label's ``text``, carrying LVGL
+inline-recolour markup — never a screen re-upload.
+
+This is the **only** module that imports ``touchy_pad``, so pulling voicebot out
+to its own repo stays a one-file diff plus the PyPI switch — and the import is
+*lazy* (inside the functions that need it) so the module can be imported and
+unit-tested without the host library installed.
+
+A pad is opened **lazily**, only when there is something to show, so a pad
+plugged in later is picked up on the next message and a missing one is never
+fatal. An idle timer blanks the display after ``clear_after`` seconds of quiet.
 """
 
 from __future__ import annotations
@@ -41,6 +45,26 @@ WHITE = 0xFFFFFF
 #: The label font sizes the firmware actually compiles (see the plan's Q6);
 #: any other size silently falls back to the theme default.
 FONT_SIZES = (8, 16, 30)
+
+#: The two text layouts, plus ``auto`` — pick by panel height. ``auto`` is what
+#: ``voicebot listen`` uses; the explicit modes are an escape hatch for a panel
+#: the height rule classifies badly (e.g. a 64x64 LED matrix).
+MODE_AUTO = "auto"
+MODE_SCROLL = "scroll"
+MODE_MULTILINE = "multiline"
+DISPLAY_MODES = (MODE_AUTO, MODE_SCROLL, MODE_MULTILINE)
+
+#: Taller than this ⇒ a multiline text field; at or below ⇒ a one-line marquee.
+#: Every LED chain template the firmware ships is at most 32 rows tall
+#: (``led-32x8``, ``led-32x16-chain``, ``led-32x32-chain`` …), while LCD panels
+#: are 240–320 px tall (the ``jc4827w543`` is 272). See ``lcdout.md``.
+PANEL_HEIGHT_THRESHOLD_PX = 32
+
+#: Breathing room around the multiline text field, and the fewest lines of text
+#: a chosen font must leave room for. Both only apply above the height rule's
+#: threshold (the scrolling layout stays edge-to-edge).
+PANEL_PADDING_PX = 8
+MIN_PANEL_LINES = 2
 
 #: Marquee speed for the scrolling label, in px/s (touchy-pad ≥ 0.3.8, the
 #: release that carries stage LB19's ``Label.scroll_speed_px_s``). LVGL's own
@@ -85,6 +109,34 @@ def font_for(height: int) -> int:
     inside the set the firmware actually ships.
     """
     fits = [size for size in FONT_SIZES if size <= height]
+    return max(fits) if fits else FONT_SIZES[0]
+
+
+def resolve_mode(requested: str, height: int) -> str:
+    """The layout for a panel: an explicit choice, else the height rule.
+
+    ``MODE_SCROLL`` / ``MODE_MULTILINE`` win over the geometry. Anything else —
+    ``auto``, an unknown env-var value — falls through to the rule, because a
+    bad configuration must not stop a performance.
+    """
+    if requested in (MODE_SCROLL, MODE_MULTILINE):
+        return requested
+    return MODE_SCROLL if height <= PANEL_HEIGHT_THRESHOLD_PX else MODE_MULTILINE
+
+
+def panel_inset(height: int) -> int:
+    """Breathing room around the multiline text field, smaller on short panels."""
+    return max(2, min(PANEL_PADDING_PX, height // 8))
+
+
+def font_for_panel(height: int) -> int:
+    """Largest compiled font that still leaves :data:`MIN_PANEL_LINES` of text.
+
+    Unlike :func:`font_for` this keeps room for a *second* line, so a short LCD
+    drops to 16 px rather than rendering one clipped line at 30 px.
+    """
+    inner = height - 2 * panel_inset(height)
+    fits = [size for size in FONT_SIZES if size * MIN_PANEL_LINES <= inner]
     return max(fits) if fits else FONT_SIZES[0]
 
 
@@ -136,12 +188,14 @@ def _safe_close(pad: Any) -> None:
 
 
 class PadDisplay:
-    """Owns the on-device scrolling-label screen and the per-quip updates.
+    """Owns the on-device text screen and the per-quip updates.
 
-    ``pad`` may be injected (tests use a stub); otherwise a real pad is opened
-    lazily on the first :meth:`show`. All pad calls are serialized by a lock,
-    because :meth:`show` runs on the listener's reply worker while the idle-clear
-    timer fires on its own thread.
+    The screen is a scrolling marquee on a short panel and a wrapped multiline
+    text field on a tall one (:func:`resolve_mode`). ``pad`` may be injected
+    (tests use a stub); otherwise a real pad is opened lazily on the first
+    :meth:`show`. All pad calls are serialized by a lock, because :meth:`show`
+    runs on the listener's reply worker while the idle-clear timer fires on its
+    own thread.
     """
 
     def __init__(
@@ -150,6 +204,7 @@ class PadDisplay:
         *,
         screen_name: str = SCREEN_NAME,
         clear_after: float = DEFAULT_CLEAR_AFTER_S,
+        display_mode: str = MODE_AUTO,
         font_size: int | None = None,
         scroll_speed_px_s: int = DEFAULT_SCROLL_SPEED_PX_S,
         timer_factory: Callable[[float, Callable[[], None]], Timer] = _daemon_timer,
@@ -158,12 +213,14 @@ class PadDisplay:
         self._prepared = False
         self._screen_name = screen_name
         self._clear_after = float(clear_after)
+        self._display_mode = display_mode
         self._font_size = font_size
         self._scroll_speed_px_s = scroll_speed_px_s
         self._timer_factory = timer_factory
         self._lock = Lock()
         self._timer: Timer | None = None
         self._size: tuple[int, int] = (0, 0)
+        self._mode: str | None = None
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -211,7 +268,7 @@ class PadDisplay:
             self._pad = self._connect()
             if self._pad is None:
                 return None
-        if not self._prepared:
+        if not self._prepared or self._panel_changed():
             try:
                 self._prepare(self._pad)
             except Exception as exc:  # noqa: BLE001 — a bad pad is not fatal
@@ -220,10 +277,24 @@ class PadDisplay:
                 return None
             self._prepared = True
             width, height = self._size
+            info = getattr(self._pad, "board_info", None)
+            board = getattr(info, "board_name", "") or "?"
             log.info(
-                "voicebot: display ready on %dx%d (screen %r)", width, height, self._screen_name
+                "voicebot: display ready on %dx%d (%s, %s, screen %r)",
+                width,
+                height,
+                board,
+                self._mode,
+                self._screen_name,
             )
         return self._pad
+
+    def _panel_changed(self) -> bool:
+        """True when the attached pad reports a different panel than the saved screen."""
+        info = getattr(self._pad, "board_info", None)
+        width = int(getattr(info, "display_width", 0) or 0)
+        height = int(getattr(info, "display_height", 0) or 0)
+        return (width, height) != self._size
 
     def _connect(self) -> Any | None:
         """Open the pad, retrying once; ``None`` (logged) when there is none.
@@ -247,8 +318,7 @@ class PadDisplay:
         return None
 
     def _prepare(self, pad: Any) -> None:
-        """Build + save + load the one scrolling-label screen for this panel."""
-        from touchy_pad.api import LongMode, Screen, absolute, label, rect, style
+        """Read the panel, choose its layout, then save + load that screen."""
         from touchy_pad.paths import screen_path
 
         info = getattr(pad, "board_info", None)
@@ -260,6 +330,21 @@ class PadDisplay:
                 "`touchy pref from-template led-32x8` for an LED matrix"
             )
         self._size = (width, height)
+        self._mode = resolve_mode(self._display_mode, height)
+
+        screen = self._build_screen(width, height, self._mode)
+        pad.screen_save(screen)
+        pad.screen_load(screen_path(self._screen_name))
+
+    def _build_screen(self, width: int, height: int, mode: str) -> Any:
+        """Build the one label screen for *mode* (the LED or the LCD layout)."""
+        if mode == MODE_MULTILINE:
+            return self._build_panel_screen(width, height)
+        return self._build_scroll_screen(width, height)
+
+    def _build_scroll_screen(self, width: int, height: int) -> Any:
+        """One full-panel marquee — the LED-matrix layout (``ledout.md``)."""
+        from touchy_pad.api import LongMode, Screen, absolute, label, rect, style
 
         screen = Screen(self._screen_name, layout=absolute())
         screen += label(
@@ -272,8 +357,32 @@ class PadDisplay:
             rect=rect(0, 0, width, height),  # SCROLL_CIRCULAR needs a fixed box
             style=style(text_color=WHITE),
         )
-        pad.screen_save(screen)
-        pad.screen_load(screen_path(self._screen_name))
+        return screen
+
+    def _build_panel_screen(self, width: int, height: int) -> Any:
+        """One wrapped text field — the tall-panel layout (``lcdout.md``).
+
+        ``LONG_MODE_DOTS`` wraps to the fixed width and replaces the last visible
+        characters with dots when the text is taller than the box. ``WRAP`` would
+        draw past the box, and the scroll modes disable wrapping entirely
+        (``LV_TEXT_FLAG_EXPAND``), so ``DOTS`` is the one that behaves like a text
+        field.
+        """
+        from touchy_pad.api import LongMode, Screen, TextAlign, absolute, label, rect, style
+
+        inset = panel_inset(height)
+        screen = Screen(self._screen_name, layout=absolute())
+        screen += label(
+            LABEL_ID,
+            text=STARTUP_TEXT,
+            font_size=self._font_size or font_for_panel(height),
+            text_align=TextAlign.LEFT,
+            long_mode=LongMode.LONG_MODE_DOTS,  # wrap, then dots on overflow
+            recolor=True,  # the same `#RRGGBB text#` markup as the marquee
+            rect=rect(inset, inset, width - 2 * inset, height - 2 * inset),
+            style=style(text_color=WHITE),
+        )
+        return screen
 
     def _write(self, pad: Any, text: str) -> None:
         """One ``text`` property override — the whole per-quip cost."""

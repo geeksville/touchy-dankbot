@@ -30,9 +30,10 @@ class FakeDisplay:
 
     instances: ClassVar[list[FakeDisplay]] = []
 
-    def __init__(self, screen_name=None, clear_after=None):
+    def __init__(self, screen_name=None, clear_after=None, display_mode=None):
         self.screen_name = screen_name
         self.clear_after = clear_after
+        self.display_mode = display_mode
         self.started = False
         self.closed = False
         self.shown: list[tuple] = []
@@ -162,6 +163,37 @@ def test_listen_scrolls_each_quip_on_the_pad(monkeypatch, tmp_path):
     # Only the reply reaches the pad; the skipped utterance does not.
     assert [[run.text for run in runs] for runs in display.shown] == [["Time to toast!"]]
     assert display.shown[0][0].colour == 0xFF0000  # the /color/red run
+
+
+def test_listen_passes_the_display_mode_to_the_pad(monkeypatch, tmp_path):
+    _use_fake(monkeypatch, {"the bread is done baking": "Time to toast!"})
+    lines = tmp_path / "overheard.txt"
+    lines.write_text("the bread is done baking\n")
+    result = CliRunner().invoke(
+        cli.main, ["listen", "--fake", str(lines), "--display-mode", "multiline"]
+    )
+    assert result.exit_code == 0
+    assert FakeDisplay.instances[0].display_mode == "multiline"
+
+
+def test_listen_defaults_the_display_mode_to_auto(monkeypatch, tmp_path):
+    _use_fake(monkeypatch, {"the bread is done baking": "Time to toast!"})
+    lines = tmp_path / "overheard.txt"
+    lines.write_text("the bread is done baking\n")
+    result = CliRunner().invoke(cli.main, ["listen", "--fake", str(lines)])
+    assert result.exit_code == 0
+    assert FakeDisplay.instances[0].display_mode == "auto"
+
+
+def test_an_unknown_display_mode_is_rejected(monkeypatch, tmp_path):
+    _use_fake(monkeypatch, {"the bread is done baking": "Time to toast!"})
+    lines = tmp_path / "overheard.txt"
+    lines.write_text("the bread is done baking\n")
+    result = CliRunner().invoke(
+        cli.main, ["listen", "--fake", str(lines), "--display-mode", "nope"]
+    )
+    assert result.exit_code != 0
+    assert FakeDisplay.instances == []
 
 
 def test_listen_logs_heard_and_reply(monkeypatch, tmp_path, caplog):

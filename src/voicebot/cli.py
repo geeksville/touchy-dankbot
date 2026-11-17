@@ -25,6 +25,7 @@ from .audio import AudioIn, FakeTranscriptSource, read_lines
 from .config import (
     DEFAULT_CTX,
     DEFAULT_DEBOUNCE_S,
+    DEFAULT_DISPLAY_MODE,
     DEFAULT_MAX_TOKENS,
     DEFAULT_MIN_DURATION_S,
     DEFAULT_MIN_P,
@@ -36,7 +37,7 @@ from .config import (
     DEFAULT_URL,
     Settings,
 )
-from .display import DEFAULT_CLEAR_AFTER_S, SCREEN_NAME, PadDisplay
+from .display import DEFAULT_CLEAR_AFTER_S, DISPLAY_MODES, SCREEN_NAME, PadDisplay
 from .gate import UtteranceGate
 from .listen import Listener, json_emitter
 from .persona import DEFAULT_PERSONA
@@ -140,7 +141,7 @@ def _build_responder(
     return Responder(client.chat, model=model, persona=persona)
 
 
-def _make_display(screen_name: str, clear_after_s: float) -> PadDisplay:
+def _make_display(screen_name: str, clear_after_s: float, display_mode: str) -> PadDisplay:
     """The touchy-pad display, startup banner already shown.
 
     Displaying is part of ``listen`` — there is no flag to turn it off.
@@ -148,7 +149,9 @@ def _make_display(screen_name: str, clear_after_s: float) -> PadDisplay:
     actually draws, and a missing / unplugged pad is a logged warning rather than
     a crash, so the pad may be plugged in at any time.
     """
-    display = PadDisplay(screen_name=screen_name, clear_after=clear_after_s)
+    display = PadDisplay(
+        screen_name=screen_name, clear_after=clear_after_s, display_mode=display_mode
+    )
     display.start()  # the "I'm voicebot" banner (connects lazily)
     return display
 
@@ -275,6 +278,15 @@ def reply(
     show_default=True,
     help="Blank the display after N seconds with no new reply (0 = never).",
 )
+@click.option(
+    "--display-mode",
+    "display_mode",
+    type=click.Choice(DISPLAY_MODES),
+    default=DEFAULT_DISPLAY_MODE,
+    envvar="VOICEBOT_DISPLAY_MODE",
+    show_default=True,
+    help="Panel layout: auto (<= 32 px scrolls, taller wraps), scroll, or multiline.",
+)
 @_llm_options
 @click.option(
     "--json", "json_out", is_flag=True, default=False, help="Emit one JSON event per line."
@@ -288,6 +300,7 @@ def listen(
     debounce_s: float,
     screen_name: str,
     clear_after_s: float,
+    display_mode: str,
     url: str,
     model: str,
     persona: str,
@@ -300,7 +313,7 @@ def listen(
     timeout: float,
     json_out: bool,
 ) -> None:
-    """Listen, transcribe, log a witty reply per utterance, and scroll it on the pad."""
+    """Listen, transcribe, log a witty reply per utterance, and show it on the pad."""
     if not json_out:
         logging.getLogger("voicebot").setLevel(logging.INFO)
     responder = _build_responder(
@@ -321,7 +334,7 @@ def listen(
         if fake is not None
         else AudioIn(device=device, model_arch=model_arch)
     )
-    display = _make_display(screen_name, clear_after_s)
+    display = _make_display(screen_name, clear_after_s, display_mode)
     listener = Listener(
         responder,
         gate,

@@ -19,3 +19,17 @@ xvf3800 — Seeed Studio **reSpeaker XVF3800 USB 4-Mic Array**.
 * Dev-container wiring (bind `/dev/snd`, `PULSE_SERVER`→host PipeWire, ALSA +
   PortAudio libs) is in the parent repo's `.devcontainer/`; see its memory bank,
   *Dev container: host devices & audio*.
+
+## display output
+
+Two touchy-pad families, one host path (`docs/plans/lcdout.md`):
+
+* **LED matrix** — e.g. a 32×8 WS2812B panel chain (`touchy pref from-template
+  led-32x8`). Reports an 8–32 px-tall display and gets the one-line scrolling
+  marquee.
+* **LCD touchpad** — the desk unit is a **jc4827w543** module, reported as a
+  **480×272** touchable panel (observed firmware `0.3.9.dev540+e84d522`,
+  protocol 14, USB). It gets the wrapped multiline text field.
+* The **panel height** (`board_info.display_height`), never the board name,
+  chooses the layout: `<= 32` px scrolls, taller wraps. `--display-mode` can force
+  either way.

@@ -14,11 +14,18 @@ import pytest
 from voicebot.commands import COLOURS, WHITE, Run
 from voicebot.display import (
     DEFAULT_SCROLL_SPEED_PX_S,
+    FONT_SIZES,
     LABEL_ID,
     MAX_OVERRIDE_CHARS,
+    MODE_AUTO,
+    MODE_MULTILINE,
+    MODE_SCROLL,
     STARTUP_TEXT,
     PadDisplay,
     font_for,
+    font_for_panel,
+    panel_inset,
+    resolve_mode,
     to_markup,
 )
 
@@ -51,6 +58,17 @@ class FakePad:
 
     def texts(self) -> list[str]:
         return [entry.string_value for batch in self.batches for entry in batch]
+
+
+def saved_label(pad: FakePad, index: int = 0):
+    """The voicebot label from the *index*th screen the fake pad saved.
+
+    Needs the host library for the protobuf round-trip, so callers use
+    ``pytest.importorskip`` first (this helper does it too, harmlessly).
+    """
+    pytest.importorskip("touchy_pad._proto")
+    layer = pad.saved[index].to_proto().active
+    return getattr(layer, layer.WhichOneof("kind")).layout.children[0]
 
 
 # --- to_markup -------------------------------------------------------------
@@ -106,6 +124,44 @@ def test_font_for_picks_the_largest_that_fits():
     )
 
 
+# --- the layout policy -----------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("height", "expected"),
+    [
+        (8, MODE_SCROLL),
+        (16, MODE_SCROLL),
+        (32, MODE_SCROLL),
+        (33, MODE_MULTILINE),
+        (64, MODE_MULTILINE),
+        (272, MODE_MULTILINE),
+    ],
+)
+def test_auto_mode_picks_by_panel_height(height, expected):
+    assert resolve_mode(MODE_AUTO, height) == expected
+
+
+def test_an_explicit_mode_wins_over_the_height_rule():
+    assert resolve_mode(MODE_SCROLL, 272) == MODE_SCROLL
+    assert resolve_mode(MODE_MULTILINE, 8) == MODE_MULTILINE
+
+
+def test_an_unknown_mode_falls_back_to_the_height_rule():
+    assert resolve_mode("bogus", 8) == MODE_SCROLL
+    assert resolve_mode("bogus", 272) == MODE_MULTILINE
+
+
+@pytest.mark.parametrize(
+    ("height", "inset", "font"),
+    [(272, 8, 30), (64, 8, 16), (48, 6, 16), (33, 4, 8)],
+)
+def test_panel_padding_and_font(height, inset, font):
+    assert panel_inset(height) == inset
+    assert font_for_panel(height) == font
+    assert font_for_panel(height) in FONT_SIZES
+
+
 # --- showing ---------------------------------------------------------------
 
 
@@ -138,6 +194,71 @@ def test_the_saved_screen_is_a_scrolling_recolor_label():
     assert label.label.scroll_speed_px_s == DEFAULT_SCROLL_SPEED_PX_S
     assert (label.rect.w, label.rect.h) == (32, 8)
     assert any(style.font_size == 8 for style in label.styles)
+
+
+def test_a_tall_panel_gets_a_wrapped_multiline_label():
+    proto = pytest.importorskip("touchy_pad._proto")
+    pad = FakePad(width=480, height=272)
+    PadDisplay(pad, clear_after=0).show([Run("hi")])
+
+    label = saved_label(pad)
+    assert label.id == LABEL_ID
+    assert label.WhichOneof("kind") == "label"
+    assert label.label.recolor is True
+    assert label.label.text == STARTUP_TEXT
+    assert label.label.long_mode == proto.LongMode.LONG_MODE_DOTS
+    assert label.label.text_align == proto.TextAlign.LEFT
+    assert label.label.scroll_speed_px_s == 0
+    assert (label.rect.x, label.rect.y, label.rect.w, label.rect.h) == (8, 8, 464, 256)
+    assert any(style.font_size == 30 for style in label.styles)
+
+
+def test_scroll_can_be_forced_on_a_tall_panel():
+    proto = pytest.importorskip("touchy_pad._proto")
+    pad = FakePad(width=480, height=272)
+    PadDisplay(pad, clear_after=0, display_mode=MODE_SCROLL).show([Run("hi")])
+
+    label = saved_label(pad)
+    assert label.label.long_mode == proto.LongMode.LONG_MODE_SCROLL_CIRCULAR
+    assert (label.rect.w, label.rect.h) == (480, 272)
+
+
+def test_multiline_can_be_forced_on_a_short_panel():
+    proto = pytest.importorskip("touchy_pad._proto")
+    pad = FakePad(width=32, height=8)
+    PadDisplay(pad, clear_after=0, display_mode=MODE_MULTILINE).show([Run("hi")])
+
+    assert saved_label(pad).label.long_mode == proto.LongMode.LONG_MODE_DOTS
+
+
+def test_swapping_the_panel_rebuilds_the_screen_in_the_new_mode():
+    proto = pytest.importorskip("touchy_pad._proto")
+    led = FakePad(width=32, height=8)
+    display = PadDisplay(led, clear_after=0)
+    display.show([Run("a")])
+    assert display._mode == MODE_SCROLL
+
+    display._forget_pad()  # the LED matrix is unplugged
+    lcd = FakePad(width=480, height=272)
+    display._pad = lcd  # the LCD is plugged in
+    display.show([Run("b")])
+
+    assert display._mode == MODE_MULTILINE
+    assert saved_label(lcd).label.long_mode == proto.LongMode.LONG_MODE_DOTS
+    assert led.closed is True
+
+
+def test_a_changed_panel_size_is_noticed_without_a_reconnect():
+    proto = pytest.importorskip("touchy_pad._proto")
+    display = PadDisplay(FakePad(width=32, height=8), clear_after=0)
+    display.show([Run("a")])
+
+    lcd = FakePad(width=480, height=272)
+    display._pad = lcd  # the same handle slot now reports the LCD
+    display.show([Run("b")])
+
+    assert display._mode == MODE_MULTILINE
+    assert saved_label(lcd).label.long_mode == proto.LongMode.LONG_MODE_DOTS
 
 
 def test_the_marquee_speed_is_configurable():

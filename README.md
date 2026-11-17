@@ -1,8 +1,9 @@
 # voicebot
 
-An **eavesdropping desk robot**: it listens to nearby conversation, asks a small
-LLM for a witty one-liner, and scrolls that line across an addressable-LED
-matrix.
+An **eavesdropping desk robot**: it listens to nearby conversation and asks a
+small LLM for a witty one-liner, then shows it on a [touchy-pad] display — a
+one-line marquee scrolling across an addressable-LED matrix, or a wrapped text
+field on an LCD.
 
 `voicebot` is the AI half of the **creep3r** art project — the pendant LED
 pillar that overhears, quips, and scrolls. It runs on a Raspberry-Pi-class box,
@@ -15,7 +16,7 @@ the wit — no local GPU required.
 
 > **Status: early.** Today this is the **responder + listener**: text (or
 > speech) in, quip out — served by a remote Ollama server (no local model),
-> optionally scrolled on a **touchy-pad**. Speech-to-text runs locally with
+> optionally shown on a **touchy-pad**. Speech-to-text runs locally with
 > **Moonshine Voice**. The full creep3r loop (an always-on service that
 > reconnects the pad and the server) is still ahead — see
 > [docs/plans/](docs/plans/).
@@ -35,15 +36,16 @@ the wit — no local GPU required.
    [ voicebot responder ]      a witty line via a remote Ollama LLM
              |  a one-to-two-sentence quip, or /notfunny
              v
-   [ touchy-pad display ]      a scrolling label on an LED matrix / LCD
+   [ touchy-pad display ]      scrolling marquee (LED) / wrapped text (LCD)
 ```
 
 Two halves, usable independently:
 
 * **Audio in** (`voicebot listen`) — mic -> transcript -> gate -> LLM, logging
   `HEARD:` / `SKIP(...)` / `REPLY:` per utterance.
-* **LED out** (`voicebot listen`) — each quip is a *single* property write that
-  scrolls across a touchy-pad; no screen re-upload.
+* **LED out** (`voicebot listen`) — each quip is a *single* property write on a
+  touchy-pad; an LED matrix scrolls it, a tall LCD wraps it in a text field. No
+  screen re-upload.
 
 ## Install
 
@@ -135,7 +137,7 @@ All of that lives in [`src/voicebot/persona.py`](src/voicebot/persona.py) and
 The audio-in half: open the mic, transcribe speech with **Moonshine Voice**
 (streaming, CPU-only — the Raspberry Pi target), keep only utterances with at
 least a few content words, and ask the LLM for a quip, logging `HEARD:` /
-`SKIP(...)` / `REPLY:` lines and scrolling the quip on an attached touchy-pad
+`SKIP(...)` / `REPLY:` lines and showing the quip on an attached touchy-pad
 (that is always on; a missing pad just logs a warning).
 
 Those log lines go to **stderr** and are rendered with
@@ -155,6 +157,7 @@ plain text, and the message text itself is unchanged.
 | Replay instead of the mic | `--fake FILE` | — | off |
 | JSON events | `--json` | — | off |
 | On-device screen name | `--screen-name` | — | `voicebot` |
+| Panel layout | `--display-mode` | `VOICEBOT_DISPLAY_MODE` | `auto` (height rule) |
 | Blank after quiet (s) | `--clear-after` | `VOICEBOT_CLEAR_AFTER` | `120` (`0` = never) |
 
 All the LLM flags (`--url` / `--model` / `--persona` / ...) are shared with
@@ -162,22 +165,35 @@ All the LLM flags (`--url` / `--model` / `--persona` / ...) are shared with
 
 ## The display (on the touchy-pad)
 
-The LED-out half: voicebot builds **one** full-panel scrolling label on a
-touchy-pad, then each quip is a single property write (no screen re-upload).
-`/color/NAME` runs are rendered in colour via LVGL inline recolour — e.g.
-`/color/red Danger ahead` scrolls "Danger ahead" in red. See the plan in
-[docs/plans/ledout.md](docs/plans/ledout.md).
+The display half: voicebot builds **one** label screen on a touchy-pad, then each
+quip is a single property write (no screen re-upload). The layout comes from the
+panel's reported height:
+
+* **`<= 32` px tall (an LED matrix)** — one full-panel *scrolling marquee*
+  (`LONG_MODE_SCROLL_CIRCULAR`). See
+  [docs/plans/ledout.md](docs/plans/ledout.md).
+* **taller (an LCD)** — one *multiline text field* that wraps to the panel width
+  and puts `...` on the last visible line if a quip is too long
+  (`LONG_MODE_DOTS`). A typical <100-character quip fits with room to spare. See
+  [docs/plans/lcdout.md](docs/plans/lcdout.md).
+
+`--display-mode` (`VOICEBOT_DISPLAY_MODE`) overrides the rule with `scroll` or
+`multiline`; the default `auto` uses the height. `/color/NAME` runs are rendered
+in colour via LVGL inline recolour on **both** layouts — e.g.
+`/color/red Danger ahead` shows "Danger ahead" in red.
 
 * The panel shows **"I'm voicebot"** on connect, then the quips; after
   `--clear-after` seconds with nothing new it goes blank.
-* The marquee scrolls at **20 px/s** — `DEFAULT_SCROLL_SPEED_PX_S`, half of
-  LVGL's own 40 px/s default — via touchy-pad's `scroll_speed_px_s` label field
-  (stage LB19, released in touchy-pad 0.3.8).
+* On an LED matrix the marquee scrolls at **30 px/s** —
+  `DEFAULT_SCROLL_SPEED_PX_S` (slower than LVGL's own 40 px/s default) — via
+  touchy-pad's `scroll_speed_px_s` label field (stage LB19, touchy-pad 0.3.8).
 * The pad is opened **lazily** — plug it in at any time and the next quip lands
   on it. Nothing is fatal: no pad / an unplugged pad / an incompatible firmware
-  all just log a warning and retry.
-* Geometry (and the font size) come from the board's reported display size, so
-  the same code drives an 8x8 / 32x8 LED matrix and a full-size LCD.
+  all just log a warning and retry. Swapping an LED matrix for an LCD (or back)
+  rebuilds the screen in the other layout on the next quip.
+* Geometry and the font size come from the board's reported display size, so the
+  same code drives an 8x8 / 32x8 LED matrix and a 480x272 LCD; 8/16/30 px are the
+  compiled fonts, and the LCD picks the largest that leaves two lines.
 * A **fresh LED board is headless** (`0x0`) until its panel chain is
   provisioned: `touchy pref from-template led-32x8`. voicebot says so if it sees
   `0x0`.

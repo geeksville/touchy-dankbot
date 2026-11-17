@@ -23,7 +23,7 @@ of the **creep3r** art project. This repo is standalone: it depends on the
 | `src/voicebot/audio.py` | Mic capture + Moonshine STT (the audio-in stage). |
 | `src/voicebot/gate.py` | The utterance gate (min words, de-dup). |
 | `src/voicebot/listen.py` | The listen loop wiring the above together. |
-| `src/voicebot/display.py` | The **only** module that imports `touchy_pad` (the LED-out stage). |
+| `src/voicebot/display.py` | The **only** module that imports `touchy_pad` (the display stage: LED marquee or LCD text field). |
 | `src/voicebot/logs.py` | Terminal logging (rich): `HEARD` / `SKIP` / `REPLY` in colour, quips in their display colours. |
 | `src/voicebot/config.py` | Defaults + the `Settings` value objects. |
 | `tests/` | pytest (network-free; audio + touchy-pad are faked). |

@@ -1,5 +1,9 @@
 # voicebot — plan: LED out (scroll the quip on a touchy-pad)
 
+> **See also:** [`lcdout.md`](lcdout.md) extends this stage with a second layout
+> for tall panels (an LCD pad wraps the quip in a multiline text field; a
+> `<= 32`-px-tall panel keeps the scrolling marquee described here).
+
 **Where this sits.** This is `initial.md` **Stage 3** — the *output* half of the
 pipeline. Stage 1+2 (the responder) and Stage 4a (audio in) are already built, so
 the only gap left between "the model said something funny" and "the desk robot
