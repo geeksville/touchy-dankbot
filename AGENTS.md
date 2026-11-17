@@ -30,6 +30,7 @@ of the **creep3r** art project. This repo is standalone: it depends on the
 | `docs/` | `plans/` (design), `hardware.md`, `TODO.md`. |
 | `justfile` | All dev tasks — prefer `just <recipe>`. |
 | `.agents/skills/moonshine-voice/` | The Moonshine Voice SDK cheat-sheet. |
+| `.agents/skills/touchy-pad/` | The Touchy-Pad host SDK cheat-sheet (fetch the live `llms.txt` first). |
 
 ## Build / test / run
 
