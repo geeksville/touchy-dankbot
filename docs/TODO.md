@@ -1,9 +1,12 @@
 misc
 * fix scrolling rate - done: touchy-pad LB19 `scroll_speed_px_s`, voicebot scrolls at 20 px/s (`DEFAULT_SCROLL_SPEED_PX_S`)
-* do touchy release
-* use funnier model - done: `DEFAULT_MODEL` is Rocinante-X 12B Q4_K_M (jokemark pick)
-* use colors
-* add ai usage to readme
+* sdo touchy release
+* !use funnier model - done: `DEFAULT_MODEL` is Rocinante-X 12B Q4_K_M (jokemark pick)
+* use colors for empasis
+* use thought bubbles
+* !add ai usage to readme
+* thank model author
+* thank voice author
 
 * make demo video
 * pitch for layout eink screens for each stage (voice rec - thinking - output (optional - will be on scrolling led anyways)). rated g filter.
