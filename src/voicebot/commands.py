@@ -1,17 +1,30 @@
 """The ``/command`` contract: directives embedded in the model's output.
 
-Any word in the LLM's reply that starts with ``/`` is a directive to voicebot and
-is *never displayed*. Two commands exist today:
+Any *recognised* command word in the LLM's reply is a directive to voicebot and
+is never displayed. Two commands exist today:
 
 * ``/notfunny`` — the model has nothing worth saying; suppress the whole reply.
-* ``/color/NAME`` — start a coloured run. ``NAME`` is ``red`` / ``green`` /
-  ``blue`` / ``yellow`` / ``white``, or ``0xRRGGBB`` (also ``#RRGGBB`` /
-  ``RRGGBB``) so the model can pick any colour. Everything after the command is
-  that colour until the next ``/color`` (or the end of the reply).
+* ``/color/NAME`` (also accepted as ``/colour/NAME``) — start a coloured run.
+  ``NAME`` is ``red`` / ``green`` / ``blue`` / ``yellow`` / ``white``, or
+  ``0xRRGGBB`` (also ``#RRGGBB`` / ``RRGGBB``) so the model can pick any colour.
+  Everything after the command is that colour until the next ``/color`` (or the
+  end of the reply).
 
-The grammar is deliberately forgiving: a stray trailing ``/`` on the token is
-ignored (``/color/green/`` is green, not an unknown colour ``green/``), and an
-unknown command is stripped and logged rather than displayed.
+Small models routinely get the syntax slightly wrong, so the grammar is
+deliberately forgiving:
+
+* a stray *trailing* slash on the token is absorbed (``/color/green/`` is green,
+  not an unknown colour ``green/``);
+* a colour glued to its text still works — ``/color/whiteThe end`` is white
+  ``The end``, and ``/color/0xFF4D00But...`` is orange ``But...``;
+* a bare ``/color`` / ``/color/`` resets to white;
+* literal ``<br>`` / ``<br/>`` markup becomes a space;
+* a dangling slash is dropped (``wheels./`` → ``wheels.``, ``a / b`` → ``a b``)
+  while URLs (``http://example.com/x``) and word slashes (``either/or``) stay;
+* an *unknown* command is recovered as text instead of swallowed — a stray
+  leading slash keeps the word (``/meer is here`` → ``meer is here``) and an
+  invented command with a value keeps the value (``/names/Oh dear`` → ``Oh
+  dear``). A trailing unknown token is treated as junk and dropped.
 
 A reply parses into ordered :class:`Run` objects (text + colour). Colours are
 purely decorative here: LVGL renders the *unmarked* text in the label's
@@ -48,10 +61,18 @@ COLOURS = {
 #: slash-free token, so ``/color/red`` and ``/color/0xFF00AA`` both parse, and any
 #: stray *trailing* slashes are absorbed by the token rather than becoming part of
 #: the value or the displayed text — ``/color/green/`` is ``green``, not ``green/``.
-_CMD_RE = re.compile(r"(?<![/\w])/([a-z]+)(?:/([^\s/]+))?/*", re.IGNORECASE)
+#: The value group may be empty: that is how ``/nudge/`` (an invented command) is
+#: told apart from ``/meer`` (a stray slash on an ordinary word).
+_CMD_RE = re.compile(r"(?<![/\w])/([a-z]+)(?:(/)([^\s/]*))?/*", re.IGNORECASE)
 #: ``0xRRGGBB`` / ``#RRGGBB`` / a bare ``RRGGBB``.
 _HEX_RE = re.compile(r"^(?:0x|#)?([0-9a-f]{6})$", re.IGNORECASE)
+#: The same, but allowed to be glued to the following text (``0xFF4D00But``).
+_HEX_PREFIX_RE = re.compile(r"^(?:0x|#)?([0-9a-f]{6})", re.IGNORECASE)
 _SPACE_RE = re.compile(r"[ \t]+")
+#: Literal HTML-ish line breaks some models put in their replies.
+_BR_RE = re.compile(r"<\s*/?\s*br\s*/?\s*>", re.IGNORECASE)
+#: A slash that is not part of a URL/word and has nothing to command.
+_DANGLING_SLASH_RE = re.compile(r"(?<![:/])/(?![\w/])")
 
 
 @dataclass(frozen=True)
@@ -85,17 +106,53 @@ def resolve_colour(value: str) -> int | None:
     return int(match.group(1), 16) if match else None
 
 
+def _split_colour(value: str) -> tuple[int, str] | None:
+    """A ``/color/`` value → ``(colour, text glued onto it)``, or ``None``.
+
+    Models often forget the space after the colour, so the value runs on into
+    the quip (``/color/whiteI mean``, ``/color/0xFF4D00But...``). Split the
+    recognised prefix off and hand the remainder back as displayable text.
+    """
+    lowered = value.lower()
+    for name in sorted(COLOURS, key=len, reverse=True):
+        if lowered.startswith(name):
+            return COLOURS[name], value[len(name) :]
+    match = _HEX_PREFIX_RE.match(value)
+    if match:
+        return int(match.group(1), 16), value[match.end() :]
+    return None
+
+
+def _clean(text: str) -> str:
+    """Drop literal HTML breaks and dangling slashes from a display segment."""
+    return _DANGLING_SLASH_RE.sub("", _BR_RE.sub(" ", text))
+
+
+def _recover(match: re.Match[str], raw: str) -> str:
+    """The text to show for an unknown ``/word`` token (see the module doc)."""
+    value = match.group(3)
+    if value:
+        return value  # an invented command with an argument: keep the argument
+    rest = _BR_RE.sub("", raw[match.end() :]).strip(" \t\r\n.,!?;:")
+    if not rest:
+        return ""  # nothing follows it: a straggling command, not a word
+    return match.group(1)  # a stray slash in front of an ordinary word
+
+
 def _finish(segments: list[tuple[str, int]], found: list[str], skip: bool) -> ParsedReply:
     """Tidy raw ``(text, colour)`` segments into a :class:`ParsedReply`."""
     runs: list[Run] = []
     for raw_text, colour in segments:
-        text = _SPACE_RE.sub(" ", raw_text)
+        text = _SPACE_RE.sub(" ", _clean(raw_text))
         if not runs:
             text = text.lstrip(" ")  # leading space of the whole message
         elif runs[-1].text.endswith(" "):
             text = text.lstrip(" ")  # no double space across a run boundary
         if text.strip():
-            runs.append(Run(text, colour))
+            if runs and runs[-1].colour == colour:
+                runs[-1] = Run(runs[-1].text + text, colour)
+            else:
+                runs.append(Run(text, colour))
     if runs:
         runs[-1] = Run(runs[-1].text.rstrip(" "), runs[-1].colour)
     return ParsedReply(runs=tuple(runs), skip=skip or not runs, found=tuple(found))
@@ -114,18 +171,27 @@ def parse(raw: str) -> ParsedReply:
         pos = match.end()
         token = match.group(0)
         name = match.group(1).lower()
-        value = match.group(2) or ""
+        value = match.group(3)
         found.append(token)
         if name == "notfunny":
             skip = True
-        elif name == "color":
-            resolved = resolve_colour(value)
-            if resolved is None:
+        elif name in ("color", "colour"):
+            if not value:
+                log.warning("colour command %r has no colour; resetting to white", token)
+                colour = WHITE
+                continue
+            split = _split_colour(value)
+            if split is None:
                 log.warning("ignoring unknown colour %r in %r", value, token)
-            else:
-                colour = resolved
+                continue
+            colour, trailing = split
+            if trailing:
+                segments.append((trailing, colour))
         else:
-            log.warning("ignoring unknown command %r", token)
+            log.warning("recovering unknown command %r as text", token)
+            recovered = _recover(match, raw)
+            if recovered:
+                segments.append((recovered, colour))
     segments.append((raw[pos:], colour))
 
     return _finish(segments, found, skip)

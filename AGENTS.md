@@ -73,8 +73,9 @@ just bump-version          # bump version, commit, tag, push
   `reply_line`, which draw a quip in its display colours; keep their *plain*
   text (`REPLY: …`, `SKIP(too_short): …`) intact — `grep` and `caplog` rely on
   it. High-frequency RPC-ish lines go on a child logger.
-- **The `/command` contract** lives in `commands.py`; commands are stripped from
-  every displayed/printed reply. Keep `/notfunny` as the final backstop.
+- **The `/command` contract** lives in `commands.py`; recognised commands are
+  stripped from every displayed/printed reply (unknown slash tokens are recovered
+  as text). Keep `/notfunny` as the final backstop.
 - **Config is flag → env → default** via click (`default=` + `envvar=`); a new
   setting gets a `DEFAULT_*` in `config.py` and a `VOICEBOT_*` env name.
 - **No network in tests.** The `ChatClient` is injected/monkeypatched

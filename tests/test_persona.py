@@ -12,3 +12,7 @@ def test_default_persona_carries_the_contract():
     assert "/notfunny" in DEFAULT_PERSONA
     assert "/color/" in DEFAULT_PERSONA
     assert "emoji" in DEFAULT_PERSONA
+    # jokemark's two most common model mistakes: a /notfunny mixed with a quip,
+    # and a colour name glued to the following text.
+    assert "whole reply" in DEFAULT_PERSONA
+    assert "one space" in DEFAULT_PERSONA

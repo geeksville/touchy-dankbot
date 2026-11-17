@@ -109,16 +109,16 @@ Configuration is **flag -> env -> default** — click implements the precedence:
 | Setting | Flag | Env | Default |
 |---|---|---|---|
 | Server URL | `--url` | `VOICEBOT_URL` | `https://kai.pygmy-map.ts.net` |
-| Model | `--model` | `VOICEBOT_MODEL` | Hermes-3-Llama-3.1-8B |
+| Model | `--model` | `VOICEBOT_MODEL` | Human-Like-Mistral-Nemo-12B (Q8_0) |
 | Persona | `--persona` / `--persona-file` | `VOICEBOT_PERSONA` | the toaster robot |
-| Temperature | `--temperature` | `VOICEBOT_TEMP` | `0.85` |
+| Temperature | `--temperature` | `VOICEBOT_TEMP` | `0.9` |
 | min-p | `--min-p` | `VOICEBOT_MIN_P` | `0.05` |
 | Context | `--ctx` | `VOICEBOT_CTX` | `4096` |
 | Max output tokens | `--max-tokens` | `VOICEBOT_MAX_TOKENS` | `120` |
 | Native `/api/chat` | `--native` | `VOICEBOT_NATIVE` | off (use `/v1`) |
 
-Try the funnier-but-more-erratic 12B model:
-`--model hf.co/bartowski/Human-Like-Mistral-Nemo-Instruct-2407-GGUF:Q8_0`.
+Try the more disciplined 8B model:
+`--model hf.co/NousResearch/Hermes-3-Llama-3.1-8B-GGUF:latest`.
 
 ## Model bake-off (jokemark)
 
@@ -153,9 +153,10 @@ keeps covering everything `voicebot reply -f sim-overheard.txt` used to.
 
 A small model asked to "tell me a joke" regurgitates memorised dad jokes. Wit
 comes from a **persona baked into the system prompt** plus a **loosened
-sampler** (`temperature=0.85`, `min_p=0.05`). The persona also defines a tiny
-**command channel**: any word starting with `/` in the model's output is a
-directive voicebot consumes — and never displays.
+sampler** (`temperature=0.9`, `min_p=0.05`). The persona also defines a tiny
+**command channel**: a recognised command in the model's output is a directive
+voicebot consumes — and never displays (an unknown slash token is recovered as
+text).
 
 * `/notfunny` — "nothing worth saying": the reply is *suppressed* rather than
   showing a weak joke.

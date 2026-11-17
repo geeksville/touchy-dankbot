@@ -1,4 +1,4 @@
-"""The ``/command`` parser: colour runs, ``/notfunny``, and the stripping rules."""
+"""The ``/command`` parser: colour runs, ``/notfunny``, and the recovery rules."""
 
 from __future__ import annotations
 
@@ -22,6 +22,8 @@ def test_notfunny_skips():
 
 
 def test_notfunny_wins_over_text():
+    # Kept as the final backstop: the prompt tells the model not to combine
+    # them, but if it does, a skip is still a skip.
     assert parse("/notfunny I'll stay quiet").skip is True
 
 
@@ -67,12 +69,42 @@ def test_a_bad_colour_value_keeps_the_current_colour(caplog):
     assert "chartreuse" in caplog.text
 
 
-def test_an_unknown_command_is_stripped_and_logged(caplog):
+def test_a_bare_colour_resets_to_white(caplog):
+    with caplog.at_level("WARNING"):
+        out = parse("/color/red Danger /color/ safe")
+    assert out.runs == (Run("Danger ", COLOURS["red"]), Run("safe", WHITE))
+    assert out.text == "Danger safe"
+    assert "no colour" in caplog.text
+
+
+def test_an_unknown_command_is_recovered_as_text(caplog):
     with caplog.at_level("WARNING"):
         out = parse("/frobnicate hi")
-    assert out.text == "hi"
-    assert "/frobnicate" in out.found
+    assert out.text == "frobnicate hi"
+    assert out.found == ("/frobnicate",)
     assert "frobnicate" in caplog.text
+
+
+def test_a_stray_leading_slash_keeps_the_word():
+    # jokemark: "/meer is quite smitten…" means "meer is quite smitten…".
+    assert parse("/meer is quite smitten").text == "meer is quite smitten"
+    assert parse("/Oh dear, no appetisers").text == "Oh dear, no appetisers"
+
+
+def test_an_invented_command_keeps_its_value():
+    # jokemark: "/names/Oh dear…/name" — keep the argument, drop the invented
+    # command and the straggling tail.
+    assert parse("/names/Oh dear, how inconvenient./name").text == ("Oh dear, how inconvenient.")
+
+
+def test_an_unknown_command_with_a_trailing_slash_keeps_its_word():
+    assert parse("/nudge/ You mean it?").text == "nudge You mean it?"
+    assert parse("Must have been /exhausted/ by it").text == "Must have been exhausted by it"
+
+
+def test_a_trailing_unknown_command_is_dropped():
+    assert parse("that is it /cringe/").text == "that is it"
+    assert parse("that is it /name").text == "that is it"
 
 
 def test_a_command_only_reply_is_a_skip():
@@ -101,9 +133,32 @@ def test_a_trailing_slash_after_the_value_is_ignored():
     assert parse("/color/green// Danger!").runs == (Run("Danger!", COLOURS["green"]),)
 
 
+def test_the_colour_alias_is_accepted():
+    assert parse("/colour/red Danger!").runs == (Run("Danger!", COLOURS["red"]),)
+    assert parse("/Colour/0xFF4D00 Gone").runs == (Run("Gone", 0xFF4D00),)
+
+
+def test_a_colour_glued_to_its_text_is_split_apart():
+    # jokemark: "/color/whiteI mean…" and "/color/0xFF4D00But…".
+    assert parse("/color/whiteI mean this").runs == (Run("I mean this", COLOURS["white"]),)
+    assert parse("/color/0xFF4D00But I am glowing").runs == (Run("But I am glowing", 0xFF4D00),)
+    assert parse("/color/yellow<br>Oh, nice").runs == (Run("Oh, nice", COLOURS["yellow"]),)
+
+
+def test_html_breaks_become_spaces():
+    assert parse("one<br>two<br/>three<br />four").text == "one two three four"
+
+
+def test_dangling_slashes_are_dropped():
+    assert parse("it had wheels./ really").text == "it had wheels. really"
+    assert parse("a / b").text == "a b"
+    assert parse("very hard/ I bet").text == "very hard I bet"
+
+
 def test_urls_and_word_slashes_are_not_commands():
     assert parse("see http://example.com/x for more").text == "see http://example.com/x for more"
     assert parse("either/or").text == "either/or"
+    assert parse("3/4 of it").text == "3/4 of it"
 
 
 def test_resolve_colour():

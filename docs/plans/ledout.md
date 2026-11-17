@@ -99,10 +99,11 @@ overrides — never another screen upload.
 
 ## The `/command` contract — model output → voicebot directives
 
-Today the model's only control channel is the bare sentinel `NOTFUNNY`
-(`responder.py` + `persona.is_notfunny`). This stage generalises it into a tiny
-in-band command language: **any word in the model's output that starts with `/`
-is a directive to voicebot, never something to display**.
+This stage replaces the bare `NOTFUNNY` sentinel (`responder.py` +
+`persona.is_notfunny`) with a tiny in-band command language: **a recognised
+command word in the model's output is a directive to voicebot, never something
+to display** (an unknown slash token is recovered as text — see the parsing
+rules below).
 
 The two commands to define now:
 
@@ -121,25 +122,36 @@ The two commands to define now:
 ### Parsing rules
 
 * **Token shape:** `/` + `[a-z]+` + optional `/` + a value, where the value runs
-  to the next whitespace or `/`. Names are case-insensitive. Any stray *trailing*
-  slashes are ignored — `/color/green/` colours the text green (it is not the
-  unknown colour `green/`) — and the token still consumes them, so nothing is
-  displayed.
-* **Anywhere, stripped:** a command token is a directive wherever it appears and
-  is **removed** from the displayed text (so `/color/red Danger!` displays
-  `Danger!`). Whitespace left behind is collapsed.
+  to the next whitespace or `/`. Names are case-insensitive, and `/colour/NAME`
+  is accepted as a spelling of `/color/NAME`. Any stray *trailing* slashes are
+  ignored — `/color/green/` colours the text green (it is not the unknown colour
+  `green/`) — and the token still consumes them, so nothing is displayed.
+* **Anywhere, stripped:** a recognised command token is a directive wherever it
+  appears and is **removed** from the displayed text (so `/color/red Danger!`
+  displays `Danger!`). Whitespace left behind is collapsed.
 * **Colour runs:** `/color/X` starts a new run — the text *after* it (up to the
   next `/color`, or the end of the reply) is colour `X`. `Look out /color/red
   Danger!` therefore becomes two runs: `("Look out ", white)` and `("Danger!",
   red)`. That maps 1:1 onto LVGL's inline recolour, so **multi-colour within one
   reply works**.
+* **Forgiving values:** models forget the space after the colour, so split a
+  recognised colour prefix off the value and keep the rest as text —
+  `/color/whiteThe end` is white `The end`, and `/color/0xFF4D00But…` is orange
+  `But…`. A bare `/color` / `/color/` resets to white, and literal `<br>` /
+  `<br/>` becomes a space.
+* **Stray slashes:** a dangling `/` is dropped (`wheels./` → `wheels.`, `a / b`
+  → `a b`), while a URL (`http://example.com/x`) or a word slash (`either/or`)
+  is left alone.
 * **Tolerance:** the token may be dressed up however a model likes (quotes,
   trailing punctuation) — accept it and strip it.
 * **Empty result:** if stripping the commands leaves nothing, there is nothing to
   show; treat it as a skip (log `SKIP(empty)`), like `/notfunny`.
-* **Unknown command** (`/foo`, or `/color/` with a bad value): stripped from the
-  text, logged at WARNING, otherwise ignored (never displayed, never fatal). A
-  bad `/color` value leaves the run colour unchanged.
+* **Unknown command** (`/foo`): recovered as text rather than swallowed — a
+  stray leading slash keeps the word (`/meer is here` → `meer is here`), and an
+  invented command with a value keeps the value (`/names/Oh dear` → `Oh dear`).
+  A trailing unknown token is dropped as junk. Logged at WARNING, never fatal.
+* **Unknown colour value** (`/color/chartreuse`): the value is dropped and the
+  run colour is unchanged, logged at WARNING.
 * **`#` is reserved:** a literal `#` in a quip would be swallowed by the recolour
   parser (LVGL's `##` escape is dead code in this version), so the markup builder
   neutralises it — see R2.
@@ -149,14 +161,16 @@ The two commands to define now:
 `persona.DEFAULT_PERSONA` swaps the `NOTFUNNY` sentence for the new contract —
 roughly:
 
-> * If you have nothing funny to say, reply with exactly `/notfunny` (any word
->   starting with `/` is a command we consume; it is never shown).
-> * To colour your words, write `/color/NAME` — everything after it is that
->   colour until you change it again or the reply ends. NAME is `red`, `green`,
->   `blue`, `yellow`, `white`, or a hex value like `0xRRGGBB`. Text before any
->   `/color` is white, and you can switch colours several times in one reply.
->   Use colour for emphasis or a punchline.
-> * Never use `/` or `#` in ordinary text.
+> * The only commands are `/notfunny` and `/color/NAME`; never invent another.
+> * `/notfunny` is the whole reply, alone — never combine it with a quip. If you
+>   have a quip, send only the quip.
+> * `/color/NAME` — everything after it is that colour until you change it again
+>   or the reply ends. NAME is `red`, `green`, `blue`, `yellow`, `white`, or a
+>   hex value like `0xRRGGBB`. Write the colour name, one space, then the text
+>   (`/color/red Danger!`). Text before any `/color` is white, and you can switch
+>   colours several times in one reply.
+> * Plain text only: no emoji, markdown, HTML (`<br>`), or `/` outside those
+>   commands.
 
 ### Where the parsing lives
 

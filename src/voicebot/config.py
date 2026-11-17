@@ -17,13 +17,15 @@ from dataclasses import dataclass
 #: The remote Ollama server (Tailscale; verified 2026-11-04, Ollama 0.40.14).
 DEFAULT_URL = "https://kai.pygmy-map.ts.net"
 
-#: Model default. Hermes-3-8B is the reliable choice for honouring the /notfunny
-#: contract; the funnier-but-more-erratic Human-Like Mistral Nemo (12B, Q8_0) is
-#: one flag away: ``--model hf.co/bartowski/Human-Like-Mistral-Nemo-Instruct-2407-GGUF:Q8_0``.
-DEFAULT_MODEL = "hf.co/NousResearch/Hermes-3-Llama-3.1-8B-GGUF:latest"
+#: Model default. Human-Like Mistral Nemo (12B, Q8_0) is the current pick after
+#: the jokemark bake-off: funnier than Hermes, though more erratic. Hermes-3-8B
+#: remains the disciplined fallback:
+#: ``--model hf.co/NousResearch/Hermes-3-Llama-3.1-8B-GGUF:latest``.
+DEFAULT_MODEL = "hf.co/bartowski/Human-Like-Mistral-Nemo-Instruct-2407-GGUF:Q8_0"
 
 #: Loosened sampler — the launch-funny.sh lesson: wit needs creative word choice.
-DEFAULT_TEMPERATURE = 0.85
+#: 0.9 suits the Nemo default (see ``jokemark.md`` for the bake-off).
+DEFAULT_TEMPERATURE = 0.9
 DEFAULT_MIN_P = 0.05
 DEFAULT_CTX = 4096
 DEFAULT_MAX_TOKENS = 120
