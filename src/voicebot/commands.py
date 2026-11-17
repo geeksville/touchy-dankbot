@@ -5,10 +5,10 @@ is never displayed. Two commands exist today:
 
 * ``/notfunny`` — the model has nothing worth saying; suppress the whole reply.
 * ``/color/NAME`` (also accepted as ``/colour/NAME``) — start a coloured run.
-  ``NAME`` is ``red`` / ``green`` / ``blue`` / ``yellow`` / ``white``, or
-  ``0xRRGGBB`` (also ``#RRGGBB`` / ``RRGGBB``) so the model can pick any colour.
-  Everything after the command is that colour until the next ``/color`` (or the
-  end of the reply).
+  ``NAME`` is ``red`` / ``green`` / ``blue`` / ``yellow`` / ``white`` /
+  ``purple`` / ``pink``, or ``0xRRGGBB`` (also ``#RRGGBB`` / ``RRGGBB``) so the
+  model can pick any colour. Everything after the command is that colour until
+  the next ``/color`` (or the end of the reply).
 
 Small models routinely get the syntax slightly wrong, so the grammar is
 deliberately forgiving:
@@ -26,6 +26,14 @@ deliberately forgiving:
   invented command with a value keeps the value (``/names/Oh dear`` → ``Oh
   dear``). A trailing unknown token is treated as junk and dropped.
 
+Markdown emphasis is treated as *colour*, not syntax: the panel has no bold or
+italic, so ``*whirr*`` / ``**clang**`` (an action beat, a stressed word) becomes
+its own run drawn in the next of :data:`EMPHASIS_COLOURS` — red, purple, blue,
+green, pink, cycling per reply so two adjacent beats never look the same. The
+markers are stripped. A span inside an explicit ``/color`` keeps that colour
+(the model's command wins), and a ``*`` left over afterwards is markup noise
+and is dropped, like a dangling slash.
+
 A reply parses into ordered :class:`Run` objects (text + colour). Colours are
 purely decorative here: LVGL renders the *unmarked* text in the label's
 ``text_color`` (white) and only the ``#RRGGBB …#`` runs in their colour, so a
@@ -39,12 +47,19 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
+from itertools import cycle
 
 log = logging.getLogger(__name__)
 
 #: The "unmarked" colour — what LVGL renders plain (non-``#RRGGBB``) text in.
 WHITE = 0xFFFFFF
+
+#: Vivid violet and hot pink: readable on an LED matrix, and the two emphasis
+#: colours that ``/color/NAME`` did not already have.
+PURPLE = 0xA020F0
+PINK = 0xFF69B4
 
 #: Named colours accepted by ``/color/NAME``.
 COLOURS = {
@@ -53,7 +68,22 @@ COLOURS = {
     "blue": 0x0000FF,
     "yellow": 0xFFFF00,
     "white": 0xFFFFFF,
+    "purple": PURPLE,
+    "pink": PINK,
 }
+
+#: The colours cycled through for markdown emphasis — ``*whirr*``, ``*crickets*``,
+#: ``*glitches and sparkles*``. A model uses them for an action beat or a
+#: stressed word, which a display without bold/italic can only say with colour.
+#: Deliberately short (five) and loud: one reply rarely has more than two beats,
+#: and the cycle restarts at ``red`` for every reply.
+EMPHASIS_COLOURS = (
+    COLOURS["red"],
+    PURPLE,
+    COLOURS["blue"],
+    COLOURS["green"],
+    PINK,
+)
 
 #: A command token: ``/name`` optionally ``/value``, starting a word (so ``a/b``
 #: and the ``//`` in a URL are not commands). ``\w``/``/`` before the slash is
@@ -73,6 +103,12 @@ _SPACE_RE = re.compile(r"[ \t]+")
 _BR_RE = re.compile(r"<\s*/?\s*br\s*/?\s*>", re.IGNORECASE)
 #: A slash that is not part of a URL/word and has nothing to command.
 _DANGLING_SLASH_RE = re.compile(r"(?<![:/])/(?![\w/])")
+#: Markdown emphasis round an action beat or stressed word: ``*whirr*`` and
+#: ``**clang**``. Neither pattern crosses a newline (a stray ``*`` must not pair
+#: up with one paragraphs away) and the emphasis body may not contain ``*``, so
+#: ``*pop* *sparkles*`` is two spans, not one. The bold form goes first and may
+#: contain ``*`` itself, so ``**I'm not *that* special.**`` stays one span.
+_EMPHASIS_RE = re.compile(r"\*\*(?P<strong>[^\n]+?)\*\*|\*(?P<emphasis>[^*\n]+?)\*")
 
 
 @dataclass(frozen=True)
@@ -124,8 +160,13 @@ def _split_colour(value: str) -> tuple[int, str] | None:
 
 
 def _clean(text: str) -> str:
-    """Drop literal HTML breaks and dangling slashes from a display segment."""
-    return _DANGLING_SLASH_RE.sub("", _BR_RE.sub(" ", text))
+    """Drop HTML breaks, leftover emphasis markers and dangling slashes.
+
+    Asterisks are gone by now if they paired up (see :func:`_emphasised`), so a
+    stray one is markup the model forgot to close — never displayable content
+    on a panel that has no italic.
+    """
+    return _DANGLING_SLASH_RE.sub("", _BR_RE.sub(" ", text).replace("*", ""))
 
 
 def _recover(match: re.Match[str], raw: str) -> str:
@@ -139,10 +180,30 @@ def _recover(match: re.Match[str], raw: str) -> str:
     return match.group(1)  # a stray slash in front of an ordinary word
 
 
+def _emphasised(segments: Iterable[tuple[str, int]]) -> Iterator[tuple[str, int]]:
+    """Split markdown emphasis out of *segments*, cycling :data:`EMPHASIS_COLOURS`.
+
+    ``*whirr*`` / ``**clang**`` becomes its own ``(text, colour)`` segment with
+    the markers stripped, so the display can shout an action beat even though it
+    has no bold or italic. An explicit ``/color`` wins — only plain (white) text
+    is recoloured, and only a recoloured span advances the cycle, so the first
+    beat of a reply is always red.
+    """
+    colours = cycle(EMPHASIS_COLOURS)
+    for text, colour in segments:
+        pos = 0
+        for match in _EMPHASIS_RE.finditer(text):
+            yield text[pos : match.start()], colour
+            phrase = match.group("strong") or match.group("emphasis")
+            yield phrase, colour if colour != WHITE else next(colours)
+            pos = match.end()
+        yield text[pos:], colour
+
+
 def _finish(segments: list[tuple[str, int]], found: list[str], skip: bool) -> ParsedReply:
     """Tidy raw ``(text, colour)`` segments into a :class:`ParsedReply`."""
     runs: list[Run] = []
-    for raw_text, colour in segments:
+    for raw_text, colour in _emphasised(segments):
         text = _SPACE_RE.sub(" ", _clean(raw_text))
         if not runs:
             text = text.lstrip(" ")  # leading space of the whole message
@@ -153,6 +214,11 @@ def _finish(segments: list[tuple[str, int]], found: list[str], skip: bool) -> Pa
                 runs[-1] = Run(runs[-1].text + text, colour)
             else:
                 runs.append(Run(text, colour))
+        elif text and runs and not runs[-1].text.endswith(" "):
+            # A gap between two coloured runs — the space between adjacent
+            # ``*beats*`` — belongs to the run before it; dropping it entirely
+            # (as a plain whitespace segment) would fuse the neighbouring words.
+            runs[-1] = Run(runs[-1].text + " ", runs[-1].colour)
     if runs:
         runs[-1] = Run(runs[-1].text.rstrip(" "), runs[-1].colour)
     return ParsedReply(runs=tuple(runs), skip=skip or not runs, found=tuple(found))

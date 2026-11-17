@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
-from voicebot.commands import COLOURS, WHITE, Run, parse, resolve_colour
+from voicebot.commands import (
+    COLOURS,
+    EMPHASIS_COLOURS,
+    PINK,
+    PURPLE,
+    WHITE,
+    Run,
+    parse,
+    resolve_colour,
+)
 
 
 def test_plain_text_is_one_white_run():
@@ -159,6 +168,66 @@ def test_urls_and_word_slashes_are_not_commands():
     assert parse("see http://example.com/x for more").text == "see http://example.com/x for more"
     assert parse("either/or").text == "either/or"
     assert parse("3/4 of it").text == "3/4 of it"
+
+
+def test_markdown_emphasis_gets_its_own_colour_and_loses_its_markers():
+    # jokemark: "*crickets*", "*glitches and sparkles*", "*whirr*".
+    out = parse("*crickets*")
+    assert out.runs == (Run("crickets", EMPHASIS_COLOURS[0]),)
+    assert out.text == "crickets"
+
+
+def test_emphasis_cycles_through_the_emphasis_colours():
+    out = parse("*dings* *crickets* *glitches and sparkles*")
+    assert [run.colour for run in out.runs] == list(EMPHASIS_COLOURS[:3])
+    assert out.text == "dings crickets glitches and sparkles"
+
+
+def test_the_emphasis_cycle_restarts_at_red_after_the_last_colour():
+    beats = len(EMPHASIS_COLOURS) + 1
+    out = parse(" ".join(f"*beat{i}*" for i in range(beats)))
+    assert out.runs[-1].colour == EMPHASIS_COLOURS[0]
+    assert out.text == " ".join(f"beat{i}" for i in range(beats))
+
+
+def test_emphasis_inside_a_sentence_splits_the_run():
+    out = parse("Oh, I'm *so* worried")
+    assert out.runs == (
+        Run("Oh, I'm ", WHITE),
+        Run("so", EMPHASIS_COLOURS[0]),
+        Run(" worried", WHITE),
+    )
+
+
+def test_emphasis_tolerates_spaces_inside_the_markers():
+    # jokemark: "* dims slightly * Oh dear." — the padded form is common.
+    out = parse("* dims slightly * Oh dear")
+    assert out.runs == (Run("dims slightly ", EMPHASIS_COLOURS[0]), Run("Oh dear", WHITE))
+
+
+def test_bold_is_emphasis_too():
+    assert parse("**clang**").runs == (Run("clang", EMPHASIS_COLOURS[0]),)
+
+
+def test_an_explicit_colour_wins_over_emphasis():
+    # The /color command is the model's own instruction: the beat loses its
+    # markers but keeps the run's colour.
+    out = parse("/color/yellow *ding* ding")
+    assert out.runs == (Run("ding ding", COLOURS["yellow"]),)
+
+
+def test_stray_asterisks_are_dropped():
+    # jokemark: hermes-3 opens replies with a lone "*", then a /color command.
+    out = parse("* /color/red Ah, the age-old question")
+    assert out.runs == (Run("Ah, the age-old question", COLOURS["red"]),)
+    assert parse("The bulb flickers *").text == "The bulb flickers"
+
+
+def test_purple_and_pink_are_named_colours():
+    assert parse("/color/purple hi").runs[0].colour == PURPLE
+    assert parse("/color/pink hi").runs[0].colour == PINK
+    assert resolve_colour("purple") == PURPLE
+    assert resolve_colour("pink") == PINK
 
 
 def test_resolve_colour():

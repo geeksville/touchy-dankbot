@@ -110,7 +110,7 @@ The two commands to define now:
 | Command | Meaning |
 |---|---|
 | `/notfunny` | The model has nothing worth saying → suppress the whole reply (replaces the `NOTFUNNY` sentinel). |
-| `/color/xxx` | Print the text in colour `xxx`, where `xxx` is `red` / `green` / `blue` / `yellow` / `white` (case-insensitive) or an exact `0xRRGGBB` (also accept `#RRGGBB` / bare `RRGGBB`) so the model can pick *any* colour. |
+| `/color/xxx` | Print the text in colour `xxx`, where `xxx` is `red` / `green` / `blue` / `yellow` / `white` / `purple` / `pink` (case-insensitive) or an exact `0xRRGGBB` (also accept `#RRGGBB` / bare `RRGGBB`) so the model can pick *any* colour. |
 
 …and the grammar is deliberately open, so more commands (`/speed/…`,
 `/repeat/…`) become a table entry rather than a redesign.
@@ -150,6 +150,16 @@ The two commands to define now:
   stray leading slash keeps the word (`/meer is here` → `meer is here`), and an
   invented command with a value keeps the value (`/names/Oh dear` → `Oh dear`).
   A trailing unknown token is dropped as junk. Logged at WARNING, never fatal.
+* **Emphasis is colour:** the panel has no bold or italic, and small models
+  write action beats and stressed words in markdown anyway — `*whirr*`,
+  `*crickets*`, `*glitches and sparkles*`, `* dims slightly *`, `**clang**`.
+  Such a span becomes its own run in the next of `EMPHASIS_COLOURS` — red,
+  purple, blue, green, pink, cycling per reply — and the markers are removed
+  (`*whirr*` scrolls as red `whirr`). An explicit `/color` wins over the cycle
+  (the span keeps the run's colour, the markers still go), and a `*` left over
+  after pairing is markup noise and is dropped, like a dangling slash. The
+  whitespace between two adjacent beats stays with the first, so
+  `*pop* *sparkles*` never fuses into `popsparkles`.
 * **Unknown colour value** (`/color/chartreuse`): the value is dropped and the
   run colour is unchanged, logged at WARNING.
 * **`#` is reserved:** a literal `#` in a quip would be swallowed by the recolour
@@ -193,7 +203,12 @@ class ParsedReply:
         return "".join(r.text for r in self.runs)
 
 COLOURS = {"red": 0xFF0000, "green": 0x00FF00, "blue": 0x0000FF,
-           "yellow": 0xFFFF00, "white": 0xFFFFFF}
+           "yellow": 0xFFFF00, "white": 0xFFFFFF,
+           "purple": 0xA020F0, "pink": 0xFF69B4}
+
+#: Markdown emphasis is drawn in these, cycling per reply.
+EMPHASIS_COLOURS = (COLOURS["red"], COLOURS["purple"], COLOURS["blue"],
+                    COLOURS["green"], COLOURS["pink"])
 
 def parse(raw: str) -> ParsedReply: ...
 ```

@@ -75,7 +75,10 @@ just bump-version          # bump version, commit, tag, push
   it. High-frequency RPC-ish lines go on a child logger.
 - **The `/command` contract** lives in `commands.py`; recognised commands are
   stripped from every displayed/printed reply (unknown slash tokens are recovered
-  as text). Keep `/notfunny` as the final backstop.
+  as text). Keep `/notfunny` as the final backstop. Markdown emphasis
+  (`*whirr*`, `**clang**`) is not a command — it is split into its own run and
+  drawn in `EMPHASIS_COLOURS` (red, purple, blue, green, pink; cycling per
+  reply) with the markers stripped, because the panel has no bold or italic.
 - **Config is flag → env → default** via click (`default=` + `envvar=`); a new
   setting gets a `DEFAULT_*` in `config.py` and a `VOICEBOT_*` env name.
 - **No network in tests.** The `ChatClient` is injected/monkeypatched

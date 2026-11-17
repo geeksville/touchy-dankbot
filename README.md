@@ -164,7 +164,13 @@ text).
 * `/notfunny` — "nothing worth saying": the reply is *suppressed* rather than
   showing a weak joke.
 * `/color/NAME` — colour the text — `red` / `green` / `blue` / `yellow` /
-  `white`, or a `0xRRGGBB` hex, e.g. `/color/red Danger ahead`.
+  `white` / `purple` / `pink`, or a `0xRRGGBB` hex, e.g. `/color/red Danger
+  ahead`.
+
+Markdown emphasis becomes colour too, since the panel has no bold or italic:
+`*whirr*`, `*crickets*`, `*glitches and sparkles*` scroll as the phrase alone,
+cycling red → purple → blue → green → pink (an explicit `/color` still wins, and
+any leftover `*` is dropped).
 
 All of that lives in [`src/voicebot/persona.py`](src/voicebot/persona.py) and
 [`src/voicebot/commands.py`](src/voicebot/commands.py).
@@ -215,9 +221,10 @@ panel's reported height:
   [docs/plans/lcdout.md](docs/plans/lcdout.md).
 
 `--display-mode` (`VOICEBOT_DISPLAY_MODE`) overrides the rule with `scroll` or
-`multiline`; the default `auto` uses the height. `/color/NAME` runs are rendered
-in colour via LVGL inline recolour on **both** layouts — e.g.
-`/color/red Danger ahead` shows "Danger ahead" in red.
+`multiline`; the default `auto` uses the height. `/color/NAME` runs (and the
+colour runs the parser makes from `*emphasis*`) are rendered in colour via LVGL
+inline recolour on **both** layouts — e.g. `/color/red Danger ahead` shows
+"Danger ahead" in red.
 
 * The panel shows **"I'm voicebot"** on connect, then the quips; after
   `--clear-after` seconds with nothing new it goes blank.
