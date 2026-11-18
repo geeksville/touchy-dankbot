@@ -219,6 +219,11 @@ display scrolls** for it (see [`src/dankbot/logs.py`](src/dankbot/logs.py)) — 
 a colour reply is visible without the pad. A pipe or `NO_COLOR` falls back to
 plain text, and the message text itself is unchanged.
 
+The microphone is **supervised**: `dankbot listen` watches its PortAudio capture
+stream and, if the array goes away (unplugging the USB cable), re-opens it — so
+plugging the mic back in brings the ears back with no restart, even if it lands
+on a different device index. Boot with no mic is still a hard error.
+
 | Setting | Flag | Env | Default |
 |---|---|---|---|
 | Capture device | `--device` | `DANKBOT_MIC` | auto (name ~ `respeaker`) |

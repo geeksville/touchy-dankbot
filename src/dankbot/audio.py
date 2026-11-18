@@ -11,17 +11,25 @@ is found whatever PortAudio index it lands on. Engine: Moonshine Voice's
 ``MicTranscriber``, which already does VAD, streaming and its own worker-thread
 capture + resampling to 16 kHz — we only configure it and bridge its finished
 lines onto a queue. See ``docs/plans/audioin.md``.
+
+The capture is **supervised** (:class:`AudioIn`): PortAudio only *prints* a
+callback error, so an unplugged array would otherwise leave the transcriber
+open but silent forever, with no way to notice. We poll the stream and re-open
+the mic when it dies — re-resolving the device by name, since a replug moves it
+to a new PortAudio index. See ``docs/plans/micreconnect.md``.
 """
 
 from __future__ import annotations
 
 import logging
 import queue
+import threading
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, TextIO, runtime_checkable
 
+from .config import DEFAULT_MIC_HINT, DEFAULT_MODEL_ARCH, DEFAULT_RECONNECT_DELAY_S
 from .server import DankbotError
 
 log = logging.getLogger(__name__)
@@ -157,32 +165,55 @@ class AudioIn:
     worker, resampling to 16 kHz); we configure it, bridge its ``on_line``
     callback onto a queue (and log its ``on_error`` stream), and hand finished
     lines out through :meth:`lines`.
+
+    The microphone is **supervised**, because losing it is otherwise invisible
+    (see the module docstring): :meth:`lines` watches the PortAudio stream,
+    tears the transcriber down when it stops, and opens a fresh one — resolving
+    the device *again*, since a replug lands the array on a new index. The
+    first open still fails loudly (an appliance with no mic should say so);
+    only a *re*open waits and retries, until the device is back or
+    :meth:`close` interrupts it.
     """
 
     def __init__(
         self,
         *,
         device: int | str | None = None,
-        mic_hint: str | None = "respeaker",
-        model_arch: str = "small",
+        mic_hint: str | None = DEFAULT_MIC_HINT,
+        model_arch: str = DEFAULT_MODEL_ARCH,
         language: str = "en",
         models_dir: str | Path | None = None,
         channels: int | None = None,
         options: dict | None = None,
+        reconnect_delay_s: float = DEFAULT_RECONNECT_DELAY_S,
     ) -> None:
-        self._device = resolve_device(mic_hint, device=device)
+        self._device_arg = device
+        self._mic_hint = mic_hint
+        self._device: int | str | None = None
         self._model_arch = model_arch
         self._language = language
         self._models_dir = models_dir
         self._channels = channels
         self._options = options or {}
+        # How long to wait between liveness checks / re-open attempts; <= 0
+        # turns supervision off and keeps the old "open once, block" behaviour.
+        self._reconnect_delay = float(reconnect_delay_s)
+        self._last_stream_time: float | None = None
+        self._reconnect = threading.Event()  # a dead pipeline asks to be rebuilt
         self._queue: queue.Queue = queue.Queue()
         self._mic = None
+        self._closed = False
+        self._wake = threading.Event()  # interrupts a reconnect wait
 
     # -- construction ------------------------------------------------------
 
-    def _build(self):
-        """Build, load and start the Moonshine mic transcriber."""
+    def _engine(self):
+        """The Moonshine classes for our arch, or an ``AudioError``.
+
+        A bad ``--model-arch`` or a missing engine is a *configuration*
+        problem, not a device one, so it is resolved once, before the reconnect
+        loop: it should fail loudly rather than be retried forever.
+        """
         arch_name = _MOONSHINE_ARCHES.get(self._model_arch.lower().replace("_", "-"))
         if arch_name is None:
             known = ", ".join(sorted(set(_MOONSHINE_ARCHES)))
@@ -192,8 +223,21 @@ class AudioIn:
             from moonshine_voice import MicTranscriber, ModelArch
         except Exception as exc:  # pragma: no cover - dependency missing
             raise AudioError(f"speech-to-text engine unavailable: {exc}") from exc
+        return MicTranscriber, getattr(ModelArch, arch_name)
 
-        mic = MicTranscriber().language(self._language).model_arch(getattr(ModelArch, arch_name))
+    def _build(self, engine):
+        """Build, load and start a fresh Moonshine mic transcriber.
+
+        Raises ``AudioError`` for anything that keeps the microphone from coming
+        up — a device that is absent, busy, or simply not plugged back in yet —
+        which :meth:`lines` treats as transient. The device is resolved *here*
+        rather than in ``__init__`` so every reconnect sees the current
+        PortAudio index.
+        """
+        MicTranscriber, arch = engine
+        self._device = resolve_device(self._mic_hint, device=self._device_arg)
+
+        mic = MicTranscriber().language(self._language).model_arch(arch)
         if self._device is not None:
             mic.device(self._device)
         if self._channels is not None:
@@ -226,31 +270,102 @@ class AudioIn:
 
         The library delivers ``Error`` events (a capture/inference failure
         inside its audio worker) to ``on_error`` and otherwise drops them, so
-        attaching this is what keeps a broken stream from failing silently.
+        attaching this is what keeps a broken stream from failing silently. A
+        pipeline that raised is also asked to be rebuilt — a broken stream will
+        not fix itself, and re-opening is cheap next to staying mute.
         """
         log.warning("speech-to-text error: %s", error)
+        self._reconnect.set()
 
     # -- TranscriptSource --------------------------------------------------
 
     def lines(self) -> Iterator[Utterance]:
-        self._mic = self._build()
-        try:
-            while True:
-                item = self._queue.get()
-                if item is _CLOSED:
+        """Yield utterances, reopening the microphone whenever it goes away."""
+        engine = self._engine()
+        first = True
+        while not self._closed:
+            try:
+                self._mic = self._build(engine)
+            except AudioError as exc:
+                if first or self._reconnect_delay <= 0:
+                    raise  # nothing to listen to yet — say so, don't spin
+                log.warning(
+                    "microphone unavailable (%s); retrying in %.1fs", exc, self._reconnect_delay
+                )
+                if self._wait_for_device():
                     return
-                yield item
-        finally:
-            self._teardown()
+                continue
+            first = False
+            self._last_stream_time = None
+            self._reconnect.clear()
+            try:
+                yield from self._drain()
+            finally:
+                self._teardown()
+
+    def _drain(self) -> Iterator[Utterance]:
+        """Yield until closed, until the capture dies, or until a reconnect is asked for.
+
+        The inner half of :meth:`lines`: with supervision on, each quiet spell
+        is also a liveness check on the capture stream.
+        """
+        while not self._closed and not self._reconnect.is_set():
+            if self._reconnect_delay <= 0:  # supervision off: block, as we always did
+                item = self._queue.get()
+            else:
+                try:
+                    item = self._queue.get(timeout=self._reconnect_delay)
+                except queue.Empty:
+                    if not self._capture_alive():
+                        log.warning("microphone capture stopped; reconnecting")
+                        break
+                    continue
+            if item is _CLOSED:
+                return
+            yield item
+
+    def _capture_alive(self) -> bool:
+        """Is the open PortAudio capture stream still running?
+
+        ``MicTranscriber`` keeps its capture stream private and only *prints* a
+        PortAudio callback error, so a vanished device is otherwise invisible:
+        the transcriber just goes quiet. Peek at the stream and call it dead
+        when it is closed, no longer ``active``, or its clock has stopped
+        advancing across two probes (a live stream's clock always moves). Being
+        wrong here only costs one reconnect, so the probe errs that way; if the
+        library ever hides ``_sd_stream`` we cannot tell, and assume it is fine.
+        """
+        stream = getattr(self._mic, "_sd_stream", None)
+        if stream is None:
+            return True
+        try:
+            if stream.closed or not stream.active:
+                return False
+            now = float(stream.time)
+        except Exception as exc:  # noqa: BLE001 - a failed probe is not proof of life
+            log.debug("capture-stream probe failed (%s); reconnecting", exc)
+            return False
+        stalled = self._last_stream_time is not None and now <= self._last_stream_time
+        self._last_stream_time = now
+        return not stalled
+
+    def _wait_for_device(self) -> bool:
+        """Wait between reconnect attempts; ``True`` if :meth:`close` cut it short."""
+        if self._reconnect_delay <= 0:
+            return True
+        return self._wake.wait(self._reconnect_delay)
 
     def close(self) -> None:
-        # Wake lines() (if running) and stop the mic now, so a ctrl-c that
-        # interrupts the loop still releases the device.
+        # Wake lines() (if running — even mid-reconnect-wait) and stop the mic
+        # now, so a ctrl-c that interrupts the loop still releases the device.
+        self._closed = True
+        self._wake.set()
         self._queue.put(_CLOSED)
         self._teardown()
 
     def _teardown(self) -> None:
         mic, self._mic = self._mic, None
+        self._last_stream_time = None
         if mic is None:
             return
         for step in ("stop", "close"):

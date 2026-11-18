@@ -90,6 +90,14 @@ DEFAULT_MIN_DURATION_S = 0.6
 #: (plan Q9).
 DEFAULT_DEBOUNCE_S = 5.0
 
+#: Seconds between microphone liveness checks *and* between attempts to re-open
+#: the capture device after it goes away. ``dankbot listen`` watches its
+#: PortAudio stream and reconnects, because an unplugged USB array would
+#: otherwise leave the transcriber open but silent for the life of the process
+#: (see ``docs/plans/micreconnect.md``). A value ``<= 0`` disables supervision
+#: and keeps the old "open once, block forever" behaviour.
+DEFAULT_RECONNECT_DELAY_S = 2.0
+
 
 @dataclass(frozen=True)
 class AudioSettings:
@@ -101,6 +109,7 @@ class AudioSettings:
     min_words: int = DEFAULT_MIN_WORDS
     min_duration_s: float = DEFAULT_MIN_DURATION_S
     debounce_s: float = DEFAULT_DEBOUNCE_S
+    reconnect_delay_s: float = DEFAULT_RECONNECT_DELAY_S
 
 
 # ---------------------------------------------------------------------------

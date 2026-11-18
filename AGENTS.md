@@ -79,6 +79,13 @@ just bump-version          # bump version, commit, tag, push
 - **Keep `moonshine_voice` / `sounddevice` imports lazy** too (inside
   `AudioIn._build()` / `resolve_device()`), so importing `dankbot` never needs
   the native libs — and CI needs no mic.
+- **The mic is supervised.** PortAudio only *prints* a capture error, so
+  `AudioIn.lines` polls the stream (`_capture_alive`, which peeks at the
+  transcriber's `_sd_stream`) and reopens the transcriber when it dies,
+  re-resolving the device by name (a replug moves the PortAudio index). The
+  *first* open still raises `AudioError` (fail loud at boot); only a *re*open
+  waits `DEFAULT_RECONNECT_DELAY_S` and retries. See
+  `docs/plans/micreconnect.md`.
 - **Logging:** `logging.getLogger(__name__)`; `cli.main` calls `logs.configure()`
   (a rich handler on stderr — colour only on a terminal, so pipes and `--json`
   stay clean). Every command takes `--debug` / `DANKBOT_DEBUG`, whose click
