@@ -70,7 +70,11 @@ just bump-version          # bump version, commit, tag, push
   the native libs — and CI needs no mic.
 - **Logging:** `logging.getLogger(__name__)`; `cli.main` calls `logs.configure()`
   (a rich handler on stderr — colour only on a terminal, so pipes and `--json`
-  stay clean). The listen lines come from `logs.heard_line` / `skip_line` /
+  stay clean). Every command takes `--debug` / `VOICEBOT_DEBUG`, whose click
+  callback calls `logs.enable_debug()` to drop the root and `voicebot` loggers
+  to `DEBUG`; the commands raise `voicebot` to INFO with
+  `logs.ensure_verbosity()` (never quieter), so `--debug` survives. The listen
+  lines come from `logs.heard_line` / `skip_line` /
   `reply_line`, which draw a quip in its display colours; keep their *plain*
   text (`REPLY: …`, `SKIP(too_short): …`) intact — `grep` and `caplog` rely on
   it. High-frequency RPC-ish lines go on a child logger.

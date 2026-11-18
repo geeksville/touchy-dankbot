@@ -125,6 +125,11 @@ The default is what won the bake-off. Fallbacks, both already in the matrix:
 8B) or `--model hf.co/bartowski/Human-Like-Mistral-Nemo-Instruct-2407-GGUF:Q8_0`
 (the 12B runner-up).
 
+Every command also accepts `--debug` (env `VOICEBOT_DEBUG`): it lowers the
+Python logging level from `WARNING` to `DEBUG`, so the verbose detail — HTTP
+request/retry lines, display rendering, cleanup failures — is printed on stderr
+alongside the usual `HEARD:` / `SKIP(...)` / `REPLY:` lines.
+
 ## Model bake-off (jokemark)
 
 `voicebot jokemark` runs the quip stage over a corpus instead of one line at a

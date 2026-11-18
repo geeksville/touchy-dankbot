@@ -124,3 +124,48 @@ def test_configure_installs_one_handler(monkeypatch):
     finally:
         root.handlers[:] = saved_handlers
         root.setLevel(saved_level)
+
+
+def test_enable_debug_lowers_the_root_and_voicebot_loggers():
+    root = logging.getLogger()
+    voicebot = logging.getLogger("voicebot")
+    saved_levels = root.level, voicebot.level
+    try:
+        logs.enable_debug()
+        assert root.level == logging.DEBUG
+        assert voicebot.getEffectiveLevel() == logging.DEBUG
+    finally:
+        root.setLevel(saved_levels[0])
+        voicebot.setLevel(saved_levels[1])
+
+
+def test_enable_debug_lets_debug_records_through(caplog):
+    root = logging.getLogger()
+    voicebot = logging.getLogger("voicebot")
+    saved_levels = root.level, voicebot.level
+    try:
+        logs.enable_debug()
+        voicebot.debug("deep detail")
+    finally:
+        root.setLevel(saved_levels[0])
+        voicebot.setLevel(saved_levels[1])
+    assert caplog.records[-1].levelno == logging.DEBUG
+    assert "deep detail" in caplog.text
+
+
+def test_ensure_verbosity_lifts_info_but_never_hides_debug():
+    root = logging.getLogger()
+    voicebot = logging.getLogger("voicebot")
+    saved_levels = root.level, voicebot.level
+    try:
+        root.setLevel(logging.WARNING)
+        voicebot.setLevel(logging.NOTSET)
+        logs.ensure_verbosity(logging.INFO)  # listen / jokemark without --debug
+        assert voicebot.getEffectiveLevel() == logging.INFO
+
+        logs.enable_debug()
+        logs.ensure_verbosity(logging.INFO)  # ... and the same after --debug
+        assert voicebot.getEffectiveLevel() == logging.DEBUG
+    finally:
+        root.setLevel(saved_levels[0])
+        voicebot.setLevel(saved_levels[1])

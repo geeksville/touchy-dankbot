@@ -133,6 +133,31 @@ def _llm_options(fn):
     return fn
 
 
+def _enable_debug(_ctx: click.Context, _param: click.Parameter, value: bool) -> bool:
+    """Click callback for ``--debug``: switch logging to DEBUG before the command runs."""
+    if value:
+        logs.enable_debug()
+    return value
+
+
+def _debug_option(fn):
+    """Attach the shared ``--debug`` flag (flag → ``VOICEBOT_DEBUG`` → off) to *fn*.
+
+    Every command takes it, so ``voicebot listen --debug`` (and the justfile's
+    ``just listen -- --debug``, which appends args *after* the subcommand) work.
+    """
+    return click.option(
+        "--debug",
+        is_flag=True,
+        default=False,
+        envvar="VOICEBOT_DEBUG",
+        help="Also show DEBUG log records (verbose).",
+        callback=_enable_debug,
+        # The callback above acts on the flag; no command needs a `debug` arg.
+        expose_value=False,
+    )(fn)
+
+
 def _build_responder(
     *,
     url: str,
@@ -220,6 +245,7 @@ def main() -> None:
 
 
 @main.command()
+@_debug_option
 @click.option("--line", default=None, help="A single overheard line to respond to (one-shot).")
 @click.option(
     "-f",
@@ -270,6 +296,7 @@ def reply(
 
 
 @main.command()
+@_debug_option
 @click.option(
     "--fake",
     "fake",
@@ -371,7 +398,7 @@ def listen(
 ) -> None:
     """Listen, transcribe, log a witty reply per utterance, and show it on the pad."""
     if not json_out:
-        logging.getLogger("voicebot").setLevel(logging.INFO)
+        logs.ensure_verbosity(logging.INFO)
     responder = _build_responder(
         url=url,
         model=model,
@@ -410,6 +437,7 @@ def listen(
 
 
 @main.command()
+@_debug_option
 @click.option("--url", default=DEFAULT_URL, envvar="VOICEBOT_URL", show_default=True)
 @click.option("--native", is_flag=True, default=False, envvar="VOICEBOT_NATIVE")
 @click.option(
@@ -427,6 +455,7 @@ def models(url: str, native: bool, timeout: float) -> None:
 
 
 @main.command()
+@_debug_option
 @click.option(
     "--models",
     "models_file",
@@ -554,7 +583,7 @@ def jokemark(
         click.echo("voicebot: --out cannot end in .json — that is the sidecar", err=True)
         raise SystemExit(1)
 
-    logging.getLogger("voicebot").setLevel(logging.INFO)
+    logs.ensure_verbosity(logging.INFO)
     display = _optional_display(display_mode)  # None when no pad is attached
     completed: list[ModelResult] = []
     interrupted = False
@@ -620,7 +649,7 @@ def _replay(path: Path, display_mode: str) -> None:
         click.echo(f"voicebot: {exc}", err=True)
         raise SystemExit(1) from exc
 
-    logging.getLogger("voicebot").setLevel(logging.INFO)
+    logs.ensure_verbosity(logging.INFO)
     display = _optional_display(display_mode)  # None when no pad is attached
     try:
         replayed = playback(

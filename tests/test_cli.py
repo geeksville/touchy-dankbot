@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import ClassVar
 
 from click.testing import CliRunner
@@ -122,6 +123,37 @@ def test_models_lists_server_models(monkeypatch):
     result = CliRunner().invoke(cli.main, ["models"])
     assert result.exit_code == 0
     assert result.output.splitlines() == ["hermes", "nemo"]
+
+
+def _invoke_and_restore_levels(args, **kwargs):
+    """Invoke the CLI, then undo the logger levels ``--debug`` lowers.
+
+    Loggers are process-global; leaving them at DEBUG would leak into the other
+    tests (and ``configure`` keeps the rich handler for the rest of the run).
+    """
+    root = logging.getLogger()
+    voicebot = logging.getLogger("voicebot")
+    saved_levels = root.level, voicebot.level
+    try:
+        result = CliRunner().invoke(cli.main, args, **kwargs)
+        return result, (root.level, voicebot.getEffectiveLevel())
+    finally:
+        root.setLevel(saved_levels[0])
+        voicebot.setLevel(saved_levels[1])
+
+
+def test_debug_flag_lowers_logging_to_debug(monkeypatch):
+    _use_fake(monkeypatch)
+    result, levels = _invoke_and_restore_levels(["models", "--debug"])
+    assert result.exit_code == 0
+    assert levels == (logging.DEBUG, logging.DEBUG)
+
+
+def test_debug_env_lowers_logging_to_debug(monkeypatch):
+    _use_fake(monkeypatch)
+    result, levels = _invoke_and_restore_levels(["models"], env={"VOICEBOT_DEBUG": "1"})
+    assert result.exit_code == 0
+    assert levels == (logging.DEBUG, logging.DEBUG)
 
 
 def test_version_option():

@@ -10,10 +10,12 @@ Only the *presentation* changes. Every record's message is still the plain
 ``--json`` consumers, ``grep`` and ``caplog`` are unaffected — and rich drops
 the colours by itself when the output is a pipe or ``NO_COLOR`` is set.
 
-Two halves:
+The pieces:
 
 * :func:`configure` — install the rich handler on the root logger (once per
   process; called from ``voicebot.cli.main``), replacing ``logging.basicConfig``;
+* :func:`enable_debug` / :func:`ensure_verbosity` — the level changes behind the
+  ``--debug`` flag;
 * :func:`heard_line` / :func:`skip_line` / :func:`reply_line` — build the
   :class:`rich.text.Text` that a log call emits (``listen.log_emitter``).
 
@@ -154,3 +156,28 @@ def configure(level: int = DEFAULT_LEVEL) -> None:
     if root.level == logging.NOTSET or root.level > level:
         root.setLevel(level)
     root.addHandler(make_handler())
+
+
+def enable_debug() -> None:
+    """``--debug``: let DEBUG records through, for the root and ``voicebot`` loggers.
+
+    The rich handler sits on the root logger with level ``NOTSET``, so the root
+    logger decides what is emitted; ``voicebot`` is pinned too because the
+    commands normally raise it to INFO and a logger's own level caps what it
+    passes on (a ``voicebot`` logger at INFO would hide its DEBUG records).
+    """
+    logging.getLogger().setLevel(logging.DEBUG)
+    logging.getLogger("voicebot").setLevel(logging.DEBUG)
+
+
+def ensure_verbosity(level: int = logging.INFO) -> None:
+    """Make the ``voicebot`` logger at least as verbose as *level*, never quieter.
+
+    ``listen`` / ``jokemark`` call this for INFO because their ``HEARD`` /
+    ``SKIP`` / ``REPLY`` records are informational. After ``--debug`` the root
+    and ``voicebot`` loggers are already at DEBUG, so this must **not** raise
+    them back to INFO — only lower a level (or leave it inheriting from root).
+    """
+    logger = logging.getLogger("voicebot")
+    if logger.getEffectiveLevel() > level:
+        logger.setLevel(level)
