@@ -1,8 +1,8 @@
-# voicebot — AI agent guide
+# dank-bot — AI agent guide
 
 `CLAUDE.md` is a symlink to this file — keep them in sync via the symlink.
 
-`voicebot` is an eavesdropping desk robot: it listens to nearby conversation,
+`dank-bot` is an eavesdropping desk robot: it listens to nearby conversation,
 asks a small LLM (a remote [Ollama] server) for a witty one-liner, and scrolls
 that line across an addressable-LED matrix (a [touchy-pad]). It is the AI half
 of the **creep3r** art project. This repo is standalone: it depends on the
@@ -15,19 +15,19 @@ of the **creep3r** art project. This repo is standalone: it depends on the
 
 | Path | Purpose |
 |------|---------|
-| `src/voicebot/cli.py` | `click` CLI: `reply` / `models` / `jokemark` / `listen` (`listen` always scrolls on the pad). |
-| `src/voicebot/server.py` | `ChatClient` (OpenAI `/v1` + native `/api/chat`, plus `has_model` / `pull_model`) + `VoicebotError`. |
-| `src/voicebot/responder.py` | Persona → prompt → reply, and the reply value object. |
-| `src/voicebot/jokemark.py` | The model bake-off: matrix/corpus loaders, run loop, Markdown + JSON reports, playback (no-server replay), optional pad echo. |
-| `src/voicebot/persona.py` | The default persona (the toaster robot). |
-| `src/voicebot/commands.py` | The `/command` channel (`/notfunny`, `/color/NAME`). |
-| `src/voicebot/audio.py` | Mic capture + Moonshine STT (the audio-in stage). |
-| `src/voicebot/gate.py` | The utterance gate (min words, de-dup). |
-| `src/voicebot/listen.py` | The listen loop wiring the above together. |
-| `src/voicebot/display.py` | The **only** module that imports `touchy_pad` (the display stage: LED marquee or LCD text field). |
-| `src/voicebot/logs.py` | Terminal logging (rich): `HEARD` / `SKIP` / `REPLY` in colour, quips in their display colours. |
-| `src/voicebot/config.py` | Defaults + the `Settings` value objects. |
-| `src/voicebot/assets/` | Packaged jokemark data: `overheard.txt` + `jokemark-models.toml` (read via `importlib.resources`). |
+| `src/dankbot/cli.py` | `click` CLI: `reply` / `models` / `jokemark` / `listen` (`listen` always scrolls on the pad). |
+| `src/dankbot/server.py` | `ChatClient` (OpenAI `/v1` + native `/api/chat`, plus `has_model` / `pull_model`) + `DankbotError`. |
+| `src/dankbot/responder.py` | Persona → prompt → reply, and the reply value object. |
+| `src/dankbot/jokemark.py` | The model bake-off: matrix/corpus loaders, run loop, Markdown + JSON reports, playback (no-server replay), optional pad echo. |
+| `src/dankbot/persona.py` | The default persona (the toaster robot). |
+| `src/dankbot/commands.py` | The `/command` channel (`/notfunny`, `/color/NAME`). |
+| `src/dankbot/audio.py` | Mic capture + Moonshine STT (the audio-in stage). |
+| `src/dankbot/gate.py` | The utterance gate (min words, de-dup). |
+| `src/dankbot/listen.py` | The listen loop wiring the above together. |
+| `src/dankbot/display.py` | The **only** module that imports `touchy_pad` (the display stage: LED marquee or LCD text field). |
+| `src/dankbot/logs.py` | Terminal logging (rich): `HEARD` / `SKIP` / `REPLY` in colour, quips in their display colours. |
+| `src/dankbot/config.py` | Defaults + the `Settings` value objects. |
+| `src/dankbot/assets/` | Packaged jokemark data: `overheard.txt` + `jokemark-models.toml` (read via `importlib.resources`). |
 | `tests/` | pytest (network-free; audio + touchy-pad are faked). |
 | `docs/` | `plans/` (design), `hardware.md`, `TODO.md`. |
 | `justfile` | All dev tasks — prefer `just <recipe>`. |
@@ -41,7 +41,7 @@ This project uses **Poetry** (never uv/uvx). Everything goes through `just`:
 ```bash
 just install               # venv + deps
 just test                  # pytest (network-free)
-VOICEBOT_LIVE=1 just test  # + a real request to the server / the mic
+DANKBOT_LIVE=1 just test  # + a real request to the server / the mic
 just lint                  # ruff format + check
 just build                 # wheel + sdist into dist/
 just reply -- --line "..."  # run the CLI in the venv
@@ -76,13 +76,13 @@ just bump-version          # bump version, commit, tag, push
   that checkout's `app/` host library (`just use-touchy-pypi` restores the
   published package).
 - **Keep `moonshine_voice` / `sounddevice` imports lazy** too (inside
-  `AudioIn._build()` / `resolve_device()`), so importing `voicebot` never needs
+  `AudioIn._build()` / `resolve_device()`), so importing `dankbot` never needs
   the native libs — and CI needs no mic.
 - **Logging:** `logging.getLogger(__name__)`; `cli.main` calls `logs.configure()`
   (a rich handler on stderr — colour only on a terminal, so pipes and `--json`
-  stay clean). Every command takes `--debug` / `VOICEBOT_DEBUG`, whose click
-  callback calls `logs.enable_debug()` to drop the root and `voicebot` loggers
-  to `DEBUG`; the commands raise `voicebot` to INFO with
+  stay clean). Every command takes `--debug` / `DANKBOT_DEBUG`, whose click
+  callback calls `logs.enable_debug()` to drop the root and `dankbot` loggers
+  to `DEBUG`; the commands raise `dankbot` to INFO with
   `logs.ensure_verbosity()` (never quieter), so `--debug` survives. The listen
   lines come from `logs.heard_line` / `skip_line` /
   `reply_line`, which draw a quip in its display colours; keep their *plain*
@@ -95,10 +95,10 @@ just bump-version          # bump version, commit, tag, push
   drawn in `EMPHASIS_COLOURS` (red, purple, blue, green, pink; cycling per
   reply) with the markers stripped, because the panel has no bold or italic.
 - **Config is flag → env → default** via click (`default=` + `envvar=`); a new
-  setting gets a `DEFAULT_*` in `config.py` and a `VOICEBOT_*` env name.
+  setting gets a `DEFAULT_*` in `config.py` and a `DANKBOT_*` env name.
 - **No network in tests.** The `ChatClient` is injected/monkeypatched
-  everywhere; live checks are opt-in behind `VOICEBOT_LIVE=1`.
-- Version is single-sourced in `pyproject.toml` + `src/voicebot/__init__.py`;
+  everywhere; live checks are opt-in behind `DANKBOT_LIVE=1`.
+- Version is single-sourced in `pyproject.toml` + `src/dankbot/__init__.py`;
   bump both with `just bump-version` (never hand-edit one of them).
 
 ## Hardware
@@ -116,7 +116,7 @@ just bump-version          # bump version, commit, tag, push
 `just bump-version [X.Y.Z]` bumps the patch version, commits, tags `vX.Y.Z` and
 pushes. Publishing a GitHub Release then triggers
 `.github/workflows/release.yml`, which tests, builds, and publishes
-`touchy-voicebot` to PyPI via OIDC trusted publishing. `testpypi.yml` is a manual
+`dank-bot` to PyPI via OIDC trusted publishing. `testpypi.yml` is a manual
 dry-run to TestPyPI.
 
 ## Working with this repo (agent rules)

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from voicebot.commands import COLOURS, WHITE, Run
-from voicebot.responder import Reply, Responder
+from dankbot.commands import COLOURS, WHITE, Run
+from dankbot.responder import Reply, Responder
 
 
 def _chat_returning(text: str):

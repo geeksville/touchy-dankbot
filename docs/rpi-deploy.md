@@ -65,7 +65,7 @@ The best small models for witty or conversational use include:
 
 ### 4. Integration with your Python Script
 
-You can easily connect to Ollama directly on the Pi using the Python script you referenced. In the file named "voicebot", you can use the standard OpenAI client pointing to Ollama's local server:
+You can easily connect to Ollama directly on the Pi using the Python script you referenced. In the file named "dank-bot", you can use the standard OpenAI client pointing to Ollama's local server:
 
 ```python
 import requests

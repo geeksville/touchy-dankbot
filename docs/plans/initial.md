@@ -1,17 +1,17 @@
-# voicebot — plan for the early days
+# dank-bot — plan for the early days
 
 An eavesdropping desk robot: it listens to nearby conversation, decides whether
 something said is worth riffing on, asks a small LLM for a witty one-liner, and
-scrolls that line across an addressable-LED matrix. `voicebot` is the *AI half*
+scrolls that line across an addressable-LED matrix. `dank-bot` is the *AI half*
 of the parent repo's **creep3r** art project
 ([docs/led-art.md](../../../../docs/led-art.md)); this repo is a git submodule
 of `touchy-pad` today, developed standalone, and intended to be extracted to its
 own home later (exactly like the sibling `tools/googly-vr`).
 
 > **Status (2026-11-04): Stages 1 + 2 implemented; Stage 3 implemented** (see
-> [`ledout.md`](ledout.md)). The responder CLI (`voicebot reply` /
-> `voicebot models`) is built and verified against the live server, and
-> `voicebot listen` now scrolls each quip on a touchy-pad (LED
+> [`ledout.md`](ledout.md)). The responder CLI (`dank-bot reply` /
+> `dank-bot models`) is built and verified against the live server, and
+> `dank-bot listen` now scrolls each quip on a touchy-pad (LED
 > matrix or LCD) — including multi-colour via the `/color/` command; the pad is
 > driven by every `listen` run, with no flag to enable it. Speech-to-text
 > (Stage 4) and the full `creep3r` loop (Stage 5) remain **explicitly deferred**.
@@ -33,7 +33,7 @@ own home later (exactly like the sibling `tools/googly-vr`).
    [ interestingness filter ]  (deferred — cheap "is this worth riffing on?")
              │  a phrase, or nothing
              ▼
-   [ voicebot responder ]      (THIS PLAN — witty line via a remote LLM)
+   [ dank-bot responder ]      (THIS PLAN — witty line via a remote LLM)
              │  a one-to-two-sentence quip, or NOTFUNNY
              ▼
    [ touchy-pad LED matrix ]   (deferred — scrolling label text over the
@@ -53,7 +53,7 @@ server, and because the same code is reusable by the whole `creep3r` family.
   persona + sampler, print the reply. This is the direct replacement for the
   local-`llama.cpp` prototype.
 * **Stage 2 — the responder's edges**: the `NOTFUNNY` suppress-token contract,
-  batch/JSON output, `voicebot models`, config resolution, and a network-free
+  batch/JSON output, `dank-bot models`, config resolution, and a network-free
   test harness with an opt-in live test.
 
 ### Non-goals (for now)
@@ -110,18 +110,18 @@ server, and because the same code is reusable by the whole `creep3r` family.
 
 | Setting | CLI | Env | Default |
 |---|---|---|---|
-| Server URL | `--url` | `VOICEBOT_URL` | `https://kai.pygmy-map.ts.net` |
-| Model | `--model` | `VOICEBOT_MODEL` | `hf.co/NousResearch/Hermes-3-Llama-3.1-8B-GGUF:latest` |
-| Persona text | `--persona` | `VOICEBOT_PERSONA` | the toaster-robot persona (below) |
+| Server URL | `--url` | `DANKBOT_URL` | `https://kai.pygmy-map.ts.net` |
+| Model | `--model` | `DANKBOT_MODEL` | `hf.co/NousResearch/Hermes-3-Llama-3.1-8B-GGUF:latest` |
+| Persona text | `--persona` | `DANKBOT_PERSONA` | the toaster-robot persona (below) |
 | Persona file | `--persona-file` | — | (none) |
-| Temperature | `--temperature` | `VOICEBOT_TEMP` | `0.85` |
-| min-p | `--min-p` | `VOICEBOT_MIN_P` | `0.05` |
-| Context (`num_ctx`) | `--ctx` | `VOICEBOT_CTX` | `4096` |
-| Max output tokens | `--max-tokens` | `VOICEBOT_MAX_TOKENS` | `120` |
-| API surface | `--native` | `VOICEBOT_NATIVE` | off (use `/v1`) |
+| Temperature | `--temperature` | `DANKBOT_TEMP` | `0.85` |
+| min-p | `--min-p` | `DANKBOT_MIN_P` | `0.05` |
+| Context (`num_ctx`) | `--ctx` | `DANKBOT_CTX` | `4096` |
+| Max output tokens | `--max-tokens` | `DANKBOT_MAX_TOKENS` | `120` |
+| API surface | `--native` | `DANKBOT_NATIVE` | off (use `/v1`) |
 
-Env names mirror `launch-funny.sh`'s `TOUCHY_BOT_*` but rebranded `VOICEBOT_*`
-(the repo is `voicebot`); the script's `TOUCHY_BOT_NGL` (GPU layers) has no
+Env names mirror `launch-funny.sh`'s `TOUCHY_BOT_*` but rebranded `DANKBOT_*`
+(the repo is `dank-bot`); the script's `TOUCHY_BOT_NGL` (GPU layers) has no
 remote analogue and is dropped.
 
 
@@ -153,7 +153,7 @@ behaviour, including the `tests/hermes.txt` recordings:
 
 * **~~`NOTFUNNY` contract~~ → the `/command` contract (superseded — see
   [`ledout.md`](ledout.md)).** The reply is a single string; any word starting
-  with `/` is a command voicebot consumes. `/notfunny` suppresses the reply
+  with `/` is a command dank-bot consumes. `/notfunny` suppresses the reply
   (print nothing, no display update) and `/color/NAME` colours the text (many
   colours per reply). The CLI's `--json` emits `{"input":…, "reply":…,
   "skip":true|false, "model":…, "raw":…}` per line. `tests/hermes.txt` is the
@@ -162,8 +162,8 @@ behaviour, including the `tests/hermes.txt` recordings:
 ## File & component layout
 
 ```
-tools/voicebot/
-├── pyproject.toml          # Poetry; console script `voicebot`; legacy [tool.poetry] layout
+tools/dankbot/
+├── pyproject.toml          # Poetry; console script `dank-bot`; legacy [tool.poetry] layout
 ├── justfile                # install / test / lint / reply / models   (mirror googly-vr)
 ├── README.md               # quickstart once Stage 1 lands
 ├── launch-funny.sh         # kept: local-llama.cpp reference/fallback
@@ -172,7 +172,7 @@ tools/voicebot/
 │   ├── plans/initial.md    # ← this plan
 │   ├── responder.md        # research: models/persona/sampler
 │   └── transcribe.md       # research: STT (Stage 4)
-├── src/voicebot/
+├── src/dankbot/
 │   ├── __init__.py
 │   ├── cli.py          # click: `reply`, `models`  (the only click module)
 │   ├── config.py       # resolve flag→env→default; build a Settings dataclass
@@ -196,9 +196,9 @@ device output, `display.py` becomes the **only** module that imports
 
 ### Stage 1 — responder CLI (the direct port of `launch-funny.sh`)
 
-1. `pyproject.toml`: `name = "voicebot"`, `packages = [{include="voicebot",
+1. `pyproject.toml`: `name = "dank-bot"`, `packages = [{include="dank-bot",
    from="src"}]`, deps `openai >= 1.x` + `click >= 8.1`, dev group
-   `pytest`/`ruff`, console script `voicebot = "voicebot.cli:main"`. Use the
+   `pytest`/`ruff`, console script `dankbot = "dankbot.cli:main"`. Use the
    legacy `[tool.poetry]` layout (Poetry 2.x path-dep quirk, per googly-vr's
    comment) so Stage 3 can add the `touchy-pad` path dep cleanly.
 2. `persona.py` — the default persona text, the `NOTFUNNY` token, and a
@@ -215,12 +215,12 @@ device output, `display.py` becomes the **only** module that imports
      once; then a friendly message — this is a LAN/Tailscale appliance).
 4. `responder.py` — build the `[system, user]` message list from the persona +
    one overheard line; call the client; apply `is_notfunny`.
-5. `cli.py` — `voicebot reply`:
+5. `cli.py` — `dank-bot reply`:
    * `--line "…"` (one-shot), or `-f FILE` / stdin (one overheard line per
      line) as the batch driver;
    * `--url/--model/--persona/--persona-file/--temperature/--min-p/--ctx/
      --max-tokens/--native/--json/--no-notfunny`;
-   * `voicebot models` lists the server's pulled models.
+   * `dank-bot models` lists the server's pulled models.
 6. `justfile` + README quickstart. `just reply -f sim-overheard.txt` is the
    end-to-end demo against the live server.
 
@@ -228,18 +228,18 @@ device output, `display.py` becomes the **only** module that imports
 
 * `--json` structured output; `--stream` optional (prints tokens as they
   arrive) — nice for the interactive/perf feel, not required.
-* Interactive REPL mode (`voicebot reply` with no `-f`/`--line`, reading stdin
+* Interactive REPL mode (`dank-bot reply` with no `-f`/`--line`, reading stdin
   until EOF) for manual tuning of persona/sampler.
 * Graceful degradation: retry-once on timeout; `--max-tokens` guard so a
   runaway model can't flood the later LED display.
 * Golden test against `tests/hermes.txt` with a **recorded** fake client; the
-  live server test is `@pytest.mark.live`, skipped unless `VOICEBOT_LIVE=1`.
+  live server test is `@pytest.mark.live`, skipped unless `DANKBOT_LIVE=1`.
 
 ### Stage 3 — display: scroll a quip on the touchy-pad — **DONE** → [`ledout.md`](ledout.md)
 
 Implemented in full (D0–D3 + the parent-repo `Label.recolor` feature, stage
-LB17): `src/voicebot/display.py` (the sole `touchy_pad` importer) builds one
-full-panel `SCROLL_CIRCULAR` label with inline recolour enabled, `voicebot listen`
+LB17): `src/dankbot/display.py` (the sole `touchy_pad` importer) builds one
+full-panel `SCROLL_CIRCULAR` label with inline recolour enabled, `dank-bot listen`
 drives it (the `--display` flag was later dropped — the pad is always driven),
 the pad connects lazily, and an idle timer clears the
 marquee. The `touchy-pad = { path = "../../app", develop = true }` path dep and
@@ -248,7 +248,7 @@ the `just use-touchy-local` / `use-touchy-pypi` recipes are in place. See
 below.
 
 * Add the `touchy-pad = { path = "../../app", develop = true }` path dep;
-  `src/voicebot/display.py` is the sole `touchy_pad` importer.
+  `src/dankbot/display.py` is the sole `touchy_pad` importer.
 * Build **one** screen at connect: a `label` with a fixed-size box and
   `long_mode = LongMode.LONG_MODE_SCROLL_CIRCULAR`
   (`touchy_pad.api.screens.label`), saved onto the device.
@@ -280,8 +280,8 @@ below.
   fake `chat_fn`. `CliRunner` drives `cli.py` with that fake.
 * **Golden tape.** `tests/hermes.txt` encodes the `NOTFUNNY`-vs-quip contract;
   a recorded fake reproduces it deterministically.
-* **Live smoke (opt-in).** `VOICEBOT_LIVE=1 just test` runs one real
-  `voicebot reply --line "the bread is done baking"` against the server and
+* **Live smoke (opt-in).** `DANKBOT_LIVE=1 just test` runs one real
+  `dank-bot reply --line "the bread is done baking"` against the server and
   asserts a non-empty, non-`NOTFUNNY` reply — the "does the box still answer"
   check.
 * **Lint.** `just lint` = `ruff format` + `ruff check --fix`, mirroring
@@ -303,7 +303,7 @@ below.
   **Rocinante-X 12B (Q4_K_M)** — see [`jokemark.md`](jokemark.md); Hermes-3-8B
   and Nemo remain the fallbacks.
 * **Server availability / auth.** The endpoint is open over Tailscale today; if
-  it grows auth or a different hostname, `--url`/`VOICEBOT_URL` absorb it, but
+  it grows auth or a different hostname, `--url`/`DANKBOT_URL` absorb it, but
   there is no key handling yet. *Need: whether an API key is ever expected.*
 * **Latency budget.** creep3r assumed ~30 s end-to-end; a 12–32B model on this
   box may be slower. Time Stage 1 replies and record them here.
@@ -313,7 +313,7 @@ below.
 
 ## Relationship to the parent repo
 
-* Parent doc [docs/led-art.md](../../../../docs/led-art.md) names `voicebot`
+* Parent doc [docs/led-art.md](../../../../docs/led-art.md) names `dank-bot`
   as the voice→text / text→voice AI half of `creep3r`; the LED pillar firmware
   (parent-repo Stages lb1–lb16) is already in place and is what Stage 3 drives.
 * Text scrolling on the LED matrix uses the **`Label` `long_mode`** support
@@ -324,7 +324,7 @@ below.
 
 ## Kept from the original sketch
 
-The rough note this plan grew from said, in full: *use `tools/voicebot/
+The rough note this plan grew from said, in full: *use `tools/dankbot/
 launch-funny.sh` as inspiration; create a new Poetry-based Python app based on
 that script but instead of using a local `llama.cpp` use a remote Ollama server
 at `https://kai.pygmy-map.ts.net`* — plus a code snippet showing the `openai`

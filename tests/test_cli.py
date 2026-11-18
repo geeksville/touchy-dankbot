@@ -8,11 +8,11 @@ from typing import ClassVar
 
 from click.testing import CliRunner
 
-from voicebot import cli
+from dankbot import cli
 
 
 class FakeClient:
-    """Stand-in for ``voicebot.server.ChatClient`` keyed by user line."""
+    """Stand-in for ``dankbot.server.ChatClient`` keyed by user line."""
 
     replies: ClassVar[dict[str, str]] = {}
     #: ``None`` means "every model is already pulled"; a set restricts it.
@@ -36,7 +36,7 @@ class FakeClient:
 
 
 class FakeDisplay:
-    """Stand-in for ``voicebot.display.PadDisplay`` — never touches hardware."""
+    """Stand-in for ``dankbot.display.PadDisplay`` — never touches hardware."""
 
     instances: ClassVar[list[FakeDisplay]] = []
 
@@ -132,14 +132,14 @@ def _invoke_and_restore_levels(args, **kwargs):
     tests (and ``configure`` keeps the rich handler for the rest of the run).
     """
     root = logging.getLogger()
-    voicebot = logging.getLogger("voicebot")
-    saved_levels = root.level, voicebot.level
+    dankbot = logging.getLogger("dankbot")
+    saved_levels = root.level, dankbot.level
     try:
         result = CliRunner().invoke(cli.main, args, **kwargs)
-        return result, (root.level, voicebot.getEffectiveLevel())
+        return result, (root.level, dankbot.getEffectiveLevel())
     finally:
         root.setLevel(saved_levels[0])
-        voicebot.setLevel(saved_levels[1])
+        dankbot.setLevel(saved_levels[1])
 
 
 def test_debug_flag_lowers_logging_to_debug(monkeypatch):
@@ -151,14 +151,14 @@ def test_debug_flag_lowers_logging_to_debug(monkeypatch):
 
 def test_debug_env_lowers_logging_to_debug(monkeypatch):
     _use_fake(monkeypatch)
-    result, levels = _invoke_and_restore_levels(["models"], env={"VOICEBOT_DEBUG": "1"})
+    result, levels = _invoke_and_restore_levels(["models"], env={"DANKBOT_DEBUG": "1"})
     assert result.exit_code == 0
     assert levels == (logging.DEBUG, logging.DEBUG)
 
 
 def test_version_option():
     result = CliRunner().invoke(cli.main, ["--version"])
-    assert "voicebot" in result.output
+    assert "dank-bot" in result.output
 
 
 def test_listen_fake_replays_utterances(monkeypatch, tmp_path):
@@ -247,7 +247,7 @@ def test_listen_logs_heard_and_reply(monkeypatch, tmp_path, caplog):
     _use_fake(monkeypatch, {"the bread is done baking": "Time to toast!"})
     lines = tmp_path / "overheard.txt"
     lines.write_text("the bread is done baking\n")
-    with caplog.at_level(logging.INFO, logger="voicebot"):
+    with caplog.at_level(logging.INFO, logger="dankbot"):
         result = CliRunner().invoke(cli.main, ["listen", "--fake", str(lines)])
     assert result.exit_code == 0
     assert "HEARD: the bread is done baking" in caplog.text
@@ -471,7 +471,7 @@ def test_jokemark_refuses_to_overwrite_the_sidecar_with_the_report(monkeypatch, 
 def test_jokemark_playback_replays_without_the_llm(monkeypatch, tmp_path, caplog):
     import logging
 
-    from voicebot.jokemark import PLAYBACK_PAUSE_S
+    from dankbot.jokemark import PLAYBACK_PAUSE_S
 
     sidecar = _bake(monkeypatch, tmp_path, {"hello there": "/color/red hi", "bye now": "/notfunny"})
 
@@ -484,9 +484,9 @@ def test_jokemark_playback_replays_without_the_llm(monkeypatch, tmp_path, caplog
     monkeypatch.setattr(cli, "ChatClient", NoClient)
     FakeDisplay.instances = []
     pauses: list[float] = []
-    monkeypatch.setattr("voicebot.jokemark.time.sleep", pauses.append)
+    monkeypatch.setattr("dankbot.jokemark.time.sleep", pauses.append)
 
-    with caplog.at_level(logging.INFO, logger="voicebot.cli"):
+    with caplog.at_level(logging.INFO, logger="dankbot.cli"):
         result = CliRunner().invoke(cli.main, ["jokemark", "--playback", str(sidecar)])
 
     assert result.exit_code == 0
@@ -515,7 +515,7 @@ def test_jokemark_playback_without_a_pad_does_not_pause(monkeypatch, tmp_path):
     monkeypatch.setattr(cli, "PadDisplay", NoPadDisplay)
     FakeDisplay.instances = []  # forget the bake's display; keep only playback's
     pauses: list[float] = []
-    monkeypatch.setattr("voicebot.jokemark.time.sleep", pauses.append)
+    monkeypatch.setattr("dankbot.jokemark.time.sleep", pauses.append)
 
     result = CliRunner().invoke(cli.main, ["jokemark", "--playback", str(sidecar)])
 

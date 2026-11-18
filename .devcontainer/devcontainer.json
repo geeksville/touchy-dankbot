@@ -1,5 +1,5 @@
 {
-	"name": "voicebot",
+	"name": "dank-bot",
 	"build": {
 		"dockerfile": "Containerfile",
 		"context": ".",

@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 import threading
 
-from voicebot.audio import FakeTranscriptSource
-from voicebot.gate import UtteranceGate
-from voicebot.listen import (
+from dankbot.audio import FakeTranscriptSource
+from dankbot.gate import UtteranceGate
+from dankbot.listen import (
     KIND_HEARD,
     KIND_REPLY,
     KIND_SKIP,
@@ -15,7 +15,7 @@ from voicebot.listen import (
     ListenEvent,
     json_emitter,
 )
-from voicebot.responder import Responder
+from dankbot.responder import Responder
 
 
 def _responder(mapping: dict[str, str] | None = None, default: str = "Time to toast!"):
@@ -135,7 +135,7 @@ def test_json_emitter_shape(capsys):
 def test_events_are_logged_by_default(caplog):
     import logging
 
-    with caplog.at_level(logging.INFO, logger="voicebot"):
+    with caplog.at_level(logging.INFO, logger="dankbot"):
         listener = Listener(_responder(), UtteranceGate(min_words=1), inline=True)
         listener.run(FakeTranscriptSource(["the bread is done baking", "uh"]))
     assert "HEARD: the bread is done baking" in caplog.text

@@ -12,12 +12,12 @@ started before re-running the same line.
 - **`just install` / `poetry install`** — pass `--no-interaction`; the first run
   downloads wheel deps, including the `moonshine-voice` native wheel. Give it a
   bounded `timeout` and/or let it finish rather than polling.
-- **`just test`** — fast and network-free. `VOICEBOT_LIVE=1 just test` hits the
+- **`just test`** — fast and network-free. `DANKBOT_LIVE=1 just test` hits the
   real remote server, and the live audio test opens the mic and may download a
   Moonshine model.
-- **`voicebot listen`** — runs until Ctrl-C (it streams the mic). Never run it in
+- **`dank-bot listen`** — runs until Ctrl-C (it streams the mic). Never run it in
   the foreground and wait: use `--fake FILE` for a finite, hardware-free run.
-- **`voicebot reply` / `voicebot models`** — one-shot, but need network to the
+- **`dank-bot reply` / `dank-bot models`** — one-shot, but need network to the
   Ollama server.
 - **Device I/O is not guaranteed.** No mic / no touchy-pad is the normal state in
   CI and on a dev box: use `--fake` and the fakes in `tests/` rather than

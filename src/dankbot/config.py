@@ -5,7 +5,7 @@ that precedence for us (``default=`` + ``envvar=`` on every option), so this
 module only owns the default values and the frozen dataclass they feed.
 
 Env names mirror ``launch-funny.sh``'s ``TOUCHY_BOT_*`` but are rebranded
-``VOICEBOT_*`` (the repo is finally called voicebot). The script's
+``DANKBOT_*`` (the repo is finally called dank-bot). The script's
 ``TOUCHY_BOT_NGL`` — GPU layers to offload — has no remote analogue and is
 dropped.
 """
@@ -43,7 +43,7 @@ DEFAULT_PULL_TIMEOUT = 3600.0
 
 @dataclass(frozen=True)
 class Settings:
-    """Everything the :class:`~voicebot.server.ChatClient` needs to talk to the server."""
+    """Everything the :class:`~dankbot.server.ChatClient` needs to talk to the server."""
 
     url: str = DEFAULT_URL
     model: str = DEFAULT_MODEL

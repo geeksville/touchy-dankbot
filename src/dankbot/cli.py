@@ -1,18 +1,18 @@
-"""The ``voicebot`` command line.
+"""The ``dank-bot`` command line.
 
 Four commands:
 
-* ``voicebot reply`` — read overheard lines (``--line`` / ``-f FILE`` / stdin)
+* ``dank-bot reply`` — read overheard lines (``--line`` / ``-f FILE`` / stdin)
   and print a witty reply for each (commands stripped; ``/notfunny`` suppresses).
-* ``voicebot models`` — list the models the server has pulled.
-* ``voicebot jokemark`` — the model bake-off: every model/params in a TOML
+* ``dank-bot models`` — list the models the server has pulled.
+* ``dank-bot jokemark`` — the model bake-off: every model/params in a TOML
   matrix against the packaged overheard corpus, rendered to a Markdown report
   plus a JSON sidecar; ``--playback FILE`` replays that JSON instead of
   talking to the server.
-* ``voicebot listen`` — mic → Moonshine → gate → reply, scrolled on the pad.
+* ``dank-bot listen`` — mic → Moonshine → gate → reply, scrolled on the pad.
 
 Config resolution is *flag → env → default*, implemented via click's
-``default=`` + ``envvar=`` (see :mod:`voicebot.config`). The chat client is
+``default=`` + ``envvar=`` (see :mod:`dankbot.config`). The chat client is
 looked up as the module global ``ChatClient`` so tests can monkeypatch it.
 """
 
@@ -64,7 +64,7 @@ from .jokemark import (
 from .listen import Listener, json_emitter
 from .persona import DEFAULT_PERSONA
 from .responder import Reply, Responder
-from .server import ChatClient, VoicebotError
+from .server import ChatClient, DankbotError
 
 log = logging.getLogger(__name__)
 
@@ -72,12 +72,12 @@ log = logging.getLogger(__name__)
 #: default, via click). Applied by :func:`_llm_options` so the two commands
 #: cannot drift apart.
 _LLM_OPTIONS = [
-    click.option("--url", default=DEFAULT_URL, envvar="VOICEBOT_URL", show_default=True),
-    click.option("--model", default=DEFAULT_MODEL, envvar="VOICEBOT_MODEL", show_default=True),
+    click.option("--url", default=DEFAULT_URL, envvar="DANKBOT_URL", show_default=True),
+    click.option("--model", default=DEFAULT_MODEL, envvar="DANKBOT_MODEL", show_default=True),
     click.option(
         "--persona",
         default=DEFAULT_PERSONA,
-        envvar="VOICEBOT_PERSONA",
+        envvar="DANKBOT_PERSONA",
         help="System prompt (persona / comedic mechanism).",
     ),
     click.option(
@@ -90,7 +90,7 @@ _LLM_OPTIONS = [
         "--temperature",
         type=float,
         default=DEFAULT_TEMPERATURE,
-        envvar="VOICEBOT_TEMP",
+        envvar="DANKBOT_TEMP",
         show_default=True,
     ),
     click.option(
@@ -98,29 +98,29 @@ _LLM_OPTIONS = [
         "min_p",
         type=float,
         default=DEFAULT_MIN_P,
-        envvar="VOICEBOT_MIN_P",
+        envvar="DANKBOT_MIN_P",
         show_default=True,
     ),
-    click.option("--ctx", type=int, default=DEFAULT_CTX, envvar="VOICEBOT_CTX", show_default=True),
+    click.option("--ctx", type=int, default=DEFAULT_CTX, envvar="DANKBOT_CTX", show_default=True),
     click.option(
         "--max-tokens",
         type=int,
         default=DEFAULT_MAX_TOKENS,
-        envvar="VOICEBOT_MAX_TOKENS",
+        envvar="DANKBOT_MAX_TOKENS",
         show_default=True,
     ),
     click.option(
         "--native",
         is_flag=True,
         default=False,
-        envvar="VOICEBOT_NATIVE",
+        envvar="DANKBOT_NATIVE",
         help="Use Ollama's native /api/chat (exact sampler control).",
     ),
     click.option(
         "--timeout",
         type=float,
         default=DEFAULT_TIMEOUT,
-        envvar="VOICEBOT_TIMEOUT",
+        envvar="DANKBOT_TIMEOUT",
         show_default=True,
     ),
 ]
@@ -141,16 +141,16 @@ def _enable_debug(_ctx: click.Context, _param: click.Parameter, value: bool) -> 
 
 
 def _debug_option(fn):
-    """Attach the shared ``--debug`` flag (flag → ``VOICEBOT_DEBUG`` → off) to *fn*.
+    """Attach the shared ``--debug`` flag (flag → ``DANKBOT_DEBUG`` → off) to *fn*.
 
-    Every command takes it, so ``voicebot listen --debug`` (and the justfile's
+    Every command takes it, so ``dank-bot listen --debug`` (and the justfile's
     ``just listen -- --debug``, which appends args *after* the subcommand) work.
     """
     return click.option(
         "--debug",
         is_flag=True,
         default=False,
-        envvar="VOICEBOT_DEBUG",
+        envvar="DANKBOT_DEBUG",
         help="Also show DEBUG log records (verbose).",
         callback=_enable_debug,
         # The callback above acts on the flag; no command needs a `debug` arg.
@@ -192,14 +192,14 @@ def _make_display(screen_name: str, clear_after_s: float, display_mode: str) -> 
     """The touchy-pad display, startup banner already shown.
 
     Displaying is part of ``listen`` — there is no flag to turn it off.
-    :class:`~voicebot.display.PadDisplay` only reaches for ``touchy_pad`` when it
+    :class:`~dankbot.display.PadDisplay` only reaches for ``touchy_pad`` when it
     actually draws, and a missing / unplugged pad is a logged warning rather than
     a crash, so the pad may be plugged in at any time.
     """
     display = PadDisplay(
         screen_name=screen_name, clear_after=clear_after_s, display_mode=display_mode
     )
-    display.start()  # the "I'm voicebot" banner (connects lazily)
+    display.start()  # the "I'm dank-bot" banner (connects lazily)
     return display
 
 
@@ -238,7 +238,7 @@ def _settings_for(spec: ModelSpec, url: str) -> Settings:
 
 
 @click.group()
-@click.version_option(__version__, prog_name="voicebot")
+@click.version_option(__version__, prog_name="dank-bot")
 def main() -> None:
     """Witty one-liners about overheard conversation, via a remote LLM."""
     logs.configure()
@@ -290,8 +290,8 @@ def reply(
     try:
         for source in _input_lines(line, file):
             _emit(responder.respond(source), json_out)
-    except VoicebotError as exc:
-        click.echo(f"voicebot: {exc}", err=True)
+    except DankbotError as exc:
+        click.echo(f"dank-bot: {exc}", err=True)
         raise SystemExit(1) from exc
 
 
@@ -307,14 +307,14 @@ def reply(
 @click.option(
     "--device",
     default=None,
-    envvar="VOICEBOT_MIC",
+    envvar="DANKBOT_MIC",
     help="Capture device (PortAudio index or name substring). Default: auto-detect the mic array.",
 )
 @click.option(
     "--model-arch",
     "model_arch",
     default=DEFAULT_MODEL_ARCH,
-    envvar="VOICEBOT_MODEL_ARCH",
+    envvar="DANKBOT_MODEL_ARCH",
     show_default=True,
     help="STT model size: tiny|base|small|medium (all streaming).",
 )
@@ -323,7 +323,7 @@ def reply(
     "min_words",
     type=int,
     default=DEFAULT_MIN_WORDS,
-    envvar="VOICEBOT_MIN_WORDS",
+    envvar="DANKBOT_MIN_WORDS",
     show_default=True,
     help="Skip utterances with fewer than N content words (filler stripped).",
 )
@@ -332,7 +332,7 @@ def reply(
     "min_duration_s",
     type=float,
     default=DEFAULT_MIN_DURATION_S,
-    envvar="VOICEBOT_MIN_DURATION",
+    envvar="DANKBOT_MIN_DURATION",
     show_default=True,
     help="Skip utterances shorter than N seconds (when the duration is known).",
 )
@@ -341,7 +341,7 @@ def reply(
     "debounce_s",
     type=float,
     default=DEFAULT_DEBOUNCE_S,
-    envvar="VOICEBOT_DEBOUNCE",
+    envvar="DANKBOT_DEBOUNCE",
     show_default=True,
     help="Suppress an identical repeat of the previous utterance within N seconds.",
 )
@@ -357,7 +357,7 @@ def reply(
     "clear_after_s",
     type=float,
     default=DEFAULT_CLEAR_AFTER_S,
-    envvar="VOICEBOT_CLEAR_AFTER",
+    envvar="DANKBOT_CLEAR_AFTER",
     show_default=True,
     help="Blank the display after N seconds with no new reply (0 = never).",
 )
@@ -366,7 +366,7 @@ def reply(
     "display_mode",
     type=click.Choice(DISPLAY_MODES),
     default=DEFAULT_DISPLAY_MODE,
-    envvar="VOICEBOT_DISPLAY_MODE",
+    envvar="DANKBOT_DISPLAY_MODE",
     show_default=True,
     help="Panel layout: auto (<= 32 px scrolls, taller wraps), scroll, or multiline.",
 )
@@ -427,21 +427,21 @@ def listen(
     )
     try:
         listener.run(source)
-    except VoicebotError as exc:
-        click.echo(f"voicebot: {exc}", err=True)
+    except DankbotError as exc:
+        click.echo(f"dank-bot: {exc}", err=True)
         raise SystemExit(1) from exc
     except KeyboardInterrupt:  # pragma: no cover - interactive stop
-        click.echo("voicebot: stopped.", err=True)
+        click.echo("dank-bot: stopped.", err=True)
     finally:
         display.close()
 
 
 @main.command()
 @_debug_option
-@click.option("--url", default=DEFAULT_URL, envvar="VOICEBOT_URL", show_default=True)
-@click.option("--native", is_flag=True, default=False, envvar="VOICEBOT_NATIVE")
+@click.option("--url", default=DEFAULT_URL, envvar="DANKBOT_URL", show_default=True)
+@click.option("--native", is_flag=True, default=False, envvar="DANKBOT_NATIVE")
 @click.option(
-    "--timeout", type=float, default=DEFAULT_TIMEOUT, envvar="VOICEBOT_TIMEOUT", show_default=True
+    "--timeout", type=float, default=DEFAULT_TIMEOUT, envvar="DANKBOT_TIMEOUT", show_default=True
 )
 def models(url: str, native: bool, timeout: float) -> None:
     """List the models the server has pulled."""
@@ -449,8 +449,8 @@ def models(url: str, native: bool, timeout: float) -> None:
     try:
         for name in ChatClient(settings).list_models():
             click.echo(name)
-    except VoicebotError as exc:
-        click.echo(f"voicebot: {exc}", err=True)
+    except DankbotError as exc:
+        click.echo(f"dank-bot: {exc}", err=True)
         raise SystemExit(1) from exc
 
 
@@ -487,19 +487,19 @@ def models(url: str, native: bool, timeout: float) -> None:
     default=None,
     help="Replay a jokemark JSON report instead of talking to the server.",
 )
-@click.option("--url", default=DEFAULT_URL, envvar="VOICEBOT_URL", show_default=True)
+@click.option("--url", default=DEFAULT_URL, envvar="DANKBOT_URL", show_default=True)
 @click.option(
     "--native",
     is_flag=True,
     default=False,
-    envvar="VOICEBOT_NATIVE",
+    envvar="DANKBOT_NATIVE",
     help="Use Ollama's /api/chat instead of /v1 (a matrix entry may override).",
 )
 @click.option(
     "--timeout",
     type=float,
     default=DEFAULT_TIMEOUT,
-    envvar="VOICEBOT_TIMEOUT",
+    envvar="DANKBOT_TIMEOUT",
     show_default=True,
     help="Per-request chat timeout in seconds.",
 )
@@ -516,14 +516,14 @@ def models(url: str, native: bool, timeout: float) -> None:
     "display_mode",
     type=click.Choice(DISPLAY_MODES),
     default=DEFAULT_DISPLAY_MODE,
-    envvar="VOICEBOT_DISPLAY_MODE",
+    envvar="DANKBOT_DISPLAY_MODE",
     show_default=True,
     help="Layout for a touchy-pad that happens to be attached (auto, scroll, multiline).",
 )
 @click.option(
     "--persona",
     default=DEFAULT_PERSONA,
-    envvar="VOICEBOT_PERSONA",
+    envvar="DANKBOT_PERSONA",
     help="System prompt (persona / comedic mechanism).",
 )
 @click.option(
@@ -565,7 +565,7 @@ def jokemark(
         )
         lines = load_lines(_read_asset_or_file(lines_file, CORPUS_ASSET), limit=limit)
     except JokemarkError as exc:
-        click.echo(f"voicebot: {exc}", err=True)
+        click.echo(f"dank-bot: {exc}", err=True)
         raise SystemExit(1) from exc
 
     if dry_run:
@@ -580,7 +580,7 @@ def jokemark(
 
     json_out = out.with_suffix(".json")
     if json_out == out:
-        click.echo("voicebot: --out cannot end in .json — that is the sidecar", err=True)
+        click.echo("dank-bot: --out cannot end in .json — that is the sidecar", err=True)
         raise SystemExit(1)
 
     logs.ensure_verbosity(logging.INFO)
@@ -625,14 +625,14 @@ def jokemark(
         try:
             path.write_text(content, encoding="utf-8")
         except OSError as exc:
-            click.echo(f"voicebot: cannot write {path}: {exc}", err=True)
+            click.echo(f"dank-bot: cannot write {path}: {exc}", err=True)
             raise SystemExit(1) from exc
         click.echo(f"wrote {path}")
     if interrupted:  # pragma: no cover - interactive stop
-        click.echo("voicebot: interrupted — partial report written.", err=True)
+        click.echo("dank-bot: interrupted — partial report written.", err=True)
         raise SystemExit(130)
     if not any(row.reply is not None for model in results for row in model.results):
-        click.echo("voicebot: no model produced a reply.", err=True)
+        click.echo("dank-bot: no model produced a reply.", err=True)
         raise SystemExit(1)
 
 
@@ -646,7 +646,7 @@ def _replay(path: Path, display_mode: str) -> None:
     try:
         report = load_report(path.read_text(encoding="utf-8"))
     except (OSError, JokemarkError) as exc:
-        click.echo(f"voicebot: {exc}", err=True)
+        click.echo(f"dank-bot: {exc}", err=True)
         raise SystemExit(1) from exc
 
     logs.ensure_verbosity(logging.INFO)
@@ -658,7 +658,7 @@ def _replay(path: Path, display_mode: str) -> None:
             display=display.show if display is not None else None,
         )
     except KeyboardInterrupt:  # pragma: no cover - interactive stop
-        click.echo("voicebot: stopped.", err=True)
+        click.echo("dank-bot: stopped.", err=True)
         return
     finally:
         if display is not None:

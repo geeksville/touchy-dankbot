@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from voicebot.persona import DEFAULT_PERSONA
+from dankbot.persona import DEFAULT_PERSONA
 
 
 def test_default_persona_carries_the_contract():

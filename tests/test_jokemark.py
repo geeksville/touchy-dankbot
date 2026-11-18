@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from voicebot import jokemark
-from voicebot.commands import Run
-from voicebot.config import (
+from dankbot import jokemark
+from dankbot.commands import Run
+from dankbot.config import (
     DEFAULT_CTX,
     DEFAULT_MAX_TOKENS,
     DEFAULT_MIN_P,
@@ -21,7 +21,7 @@ from voicebot.config import (
     DEFAULT_TEMPERATURE,
     DEFAULT_TIMEOUT,
 )
-from voicebot.jokemark import (
+from dankbot.jokemark import (
     JokemarkError,
     LineResult,
     ModelResult,
@@ -35,8 +35,8 @@ from voicebot.jokemark import (
     render_markdown,
     run_benchmark,
 )
-from voicebot.responder import Reply
-from voicebot.server import VoicebotError
+from dankbot.responder import Reply
+from dankbot.server import DankbotError
 
 FIXED_NOW = datetime(2026, 11, 17, 21, 4, tzinfo=UTC)
 
@@ -89,14 +89,14 @@ class FakeBackend:
 
     def pull_model(self, name: str) -> None:
         if self.pull_fails:
-            raise VoicebotError("network down")
+            raise DankbotError("network down")
         self.pull_calls.append(name)
 
     def chat(self, messages: list[dict[str, str]]) -> str:
         line = messages[-1]["content"]
         self.calls.append(line)
         if self.fail_on is not None and line == self.fail_on:
-            raise VoicebotError("boom")
+            raise DankbotError("boom")
         return self.replies.get(line, "quip")
 
 

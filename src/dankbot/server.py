@@ -9,7 +9,7 @@ Two surfaces are supported against the remote Ollama server:
   ``min_p`` must be honoured *exactly* (``/v1`` may silently drop it).
 
 Every failure — bad URL, timeout, HTTP error — is normalised to
-:class:`VoicebotError` so the CLI has one thing to catch.
+:class:`DankbotError` so the CLI has one thing to catch.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ def _strip_latest(name: str) -> str:
     return name.removesuffix(":latest")
 
 
-class VoicebotError(RuntimeError):
+class DankbotError(RuntimeError):
     """Anything that stops us getting a reply from the model server."""
 
 
@@ -38,7 +38,7 @@ class ChatClient:
 
     def __init__(self, settings: Settings) -> None:
         self._s = settings
-        #: Exposed so callers can stamp it onto each :class:`~voicebot.responder.Reply`.
+        #: Exposed so callers can stamp it onto each :class:`~dankbot.responder.Reply`.
         self.model = settings.model
 
     # -- chat --------------------------------------------------------------
@@ -65,7 +65,7 @@ class ChatClient:
                 extra_body={"options": {"min_p": self._s.min_p, "num_ctx": self._s.ctx}},
             )
         except Exception as exc:
-            raise VoicebotError(f"{type(exc).__name__}: {exc}") from exc
+            raise DankbotError(f"{type(exc).__name__}: {exc}") from exc
         return resp.choices[0].message.content or ""
 
     def _chat_native(self, messages: list[dict[str, str]]) -> str:
@@ -85,7 +85,7 @@ class ChatClient:
             resp.raise_for_status()
             data = resp.json()
         except Exception as exc:
-            raise VoicebotError(f"{type(exc).__name__}: {exc}") from exc
+            raise DankbotError(f"{type(exc).__name__}: {exc}") from exc
         return data.get("message", {}).get("content", "") or ""
 
     # -- models ------------------------------------------------------------
@@ -101,7 +101,7 @@ class ChatClient:
         try:
             return [m.id for m in client.models.list().data]
         except Exception as exc:
-            raise VoicebotError(f"{type(exc).__name__}: {exc}") from exc
+            raise DankbotError(f"{type(exc).__name__}: {exc}") from exc
 
     def _models_native(self) -> list[str]:
         try:
@@ -109,7 +109,7 @@ class ChatClient:
             resp.raise_for_status()
             return [m["name"] for m in resp.json().get("models", [])]
         except Exception as exc:
-            raise VoicebotError(f"{type(exc).__name__}: {exc}") from exc
+            raise DankbotError(f"{type(exc).__name__}: {exc}") from exc
 
     # -- fetch -------------------------------------------------------------
 
@@ -134,6 +134,6 @@ class ChatClient:
             resp.raise_for_status()
             data = resp.json()
         except Exception as exc:
-            raise VoicebotError(f"{type(exc).__name__}: {exc}") from exc
+            raise DankbotError(f"{type(exc).__name__}: {exc}") from exc
         if data.get("error"):
-            raise VoicebotError(f"pull {name}: {data['error']}")
+            raise DankbotError(f"pull {name}: {data['error']}")

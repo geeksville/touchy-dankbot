@@ -1,6 +1,6 @@
 name: CI
 
-# Lint, test and package voicebot. Runs on push to main and on every PR.
+# Lint, test and package dankbot. Runs on push to main and on every PR.
 on:
   push:
     branches: [main]
@@ -56,5 +56,5 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v7
         with:
-          name: voicebot-dist
+          name: dank-bot-dist
           path: dist/*

@@ -2,11 +2,11 @@
 
 Deliberately transport-free — it is handed a ``chat`` callable
 (``messages -> text``) so tests use a fake and never touch the network. The
-:class:`~voicebot.server.ChatClient` supplies the real one.
+:class:`~dankbot.server.ChatClient` supplies the real one.
 
-The model's raw output is run through the :mod:`voicebot.commands` parser, so a
+The model's raw output is run through the :mod:`dankbot.commands` parser, so a
 :class:`Reply` carries both the plain (command-free) text and the ordered colour
-:class:`~voicebot.commands.Run` list the display renders.
+:class:`~dankbot.commands.Run` list the display renders.
 """
 
 from __future__ import annotations

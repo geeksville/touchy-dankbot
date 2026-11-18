@@ -1,4 +1,4 @@
-# voicebot — plan: quip fit (step the font down instead of clipping the quip)
+# dank-bot — plan: quip fit (step the font down instead of clipping the quip)
 
 **Where this sits.** This extends the **multiline** layout from
 [`lcdout.md`](lcdout.md) (Stage 3, *LCD out*). That plan built one wrapped text
@@ -16,7 +16,7 @@ feature that landed while the plan was being written.
 > re-upload, no new CLI flag. `just test` **250 passed / 2 skipped**;
 > `just lint` clean. Verified on the attached `jc4827w543` (protocol 15): a
 > 200-character quip goes out as `fontSizeValue: FONT_SIZE_16` and the device logs
-> `font_size=16 on 'voicebot_msg'`; the next short quip goes back to
+> `font_size=16 on 'dankbot_msg'`; the next short quip goes back to
 > `FONT_SIZE_30`. What remains is the human judgement — does 16 px read well
 > across the desk?
 
@@ -25,11 +25,11 @@ feature that landed while the plan was being written.
 Observed on the real LCD (2026-11-18), a reply to the toaster persona:
 
 ```
-DEBUG voicebot.display: rendering quip: #FF0000 tilts head# "Ah, the age-old question:
+DEBUG dankbot.display: rendering quip: #FF0000 tilts head# "Ah, the age-old question:
 sodium or potassium? I theorize they're discussing the periodic table of elements, not
 that boring white crystalline substance humans sprinkle on their grub."
 DEBUG touchy_pad.api.client.rpc: rpc -> {"setProperties": {"props": [{"widgetId":
-"voicebot_msg", "propertyName": "text", "stringValue": "<207 chars>"}]}}
+"dankbot_msg", "propertyName": "text", "stringValue": "<207 chars>"}]}}
 ```
 
 207 characters of markup (~197 drawn) at 30 px in a 464×256 field is ~9 lines;
@@ -153,7 +153,7 @@ def _write(self, pad, text, font=None):
 * `_write_quip` logs `rendering quip at 16px: …` so the choice is visible in
   `--debug`.
 * The font is sent **every** quip, not only when it changes: overrides are
-  sticky on the *device*, so a size left behind by an earlier voicebot run would
+  sticky on the *device*, so a size left behind by an earlier dank-bot run would
   otherwise survive a restart. (The idle clear sends text only.)
 * An explicit `PadDisplay(font_size=…)` becomes the ceiling, so a pinned size is
   never exceeded — but the quip may still step *below* it when it has to.
@@ -180,7 +180,7 @@ def _write(self, pad, text, font=None):
 
 | File | Change |
 |---|---|
-| `src/voicebot/display.py` | `FONT_PROPERTY = "text_font"`; `GLYPH_ADVANCE_RATIO`, `LINE_HEIGHT_RATIO`; `chars_that_fit`, `font_for_text`, `visible_chars`, `_drawn_runs` (shared fold); `PadDisplay._font_for_quip`; `_write` gained the optional font entry. Still the only `touchy_pad` importer, and still lazy. |
+| `src/dankbot/display.py` | `FONT_PROPERTY = "text_font"`; `GLYPH_ADVANCE_RATIO`, `LINE_HEIGHT_RATIO`; `chars_that_fit`, `font_for_text`, `visible_chars`, `_drawn_runs` (shared fold); `PadDisplay._font_for_quip`; `_write` gained the optional font entry. Still the only `touchy_pad` importer, and still lazy. |
 | `tests/test_display.py` | `FakePad.texts()` filters on the value oneof; new `fonts()` / `entry_names()` helpers; pure fit tests + per-quip font tests. |
 | `tests/test_display_sim.py` | Two sim tests: a long quip lands `font_size == 16` on the widget, a short one does not. |
 | `README.md` | The display section explains the step-down and the ~170/500-character budgets. |
@@ -196,7 +196,7 @@ No new config, no new CLI flag, no new screen name.
 | **F1** | Pure policy: `chars_that_fit`, `font_for_text`, `visible_chars`, the two ratio constants. | **Done** — unit tests pin the capacity table, monotonicity, the ceiling, and that a size is always in `FONT_SIZES`. |
 | **F2** | One batch: `_font_for_quip` + the `text_font` entry in `_write`; scroll mode unchanged. | **Done** — fake-pad tests (30 → 16 → 30, one batch, one screen) and sim tests. |
 | **F3** | Docs: this plan, `lcdout.md` pointers, README, version-floor notes. | **Done.** |
-| **F4** | Hardware pass on the real `jc4827w543` and an LED matrix. | **Done on the wire** — the 200-character quip is accepted as `FONT_SIZE_16` (device log: `font_size=16 on 'voicebot_msg'`), the short quip returns to 30 px, and the marquee path is untouched. Left: eyeball 16 px across the desk, and re-check on an LED matrix. |
+| **F4** | Hardware pass on the real `jc4827w543` and an LED matrix. | **Done on the wire** — the 200-character quip is accepted as `FONT_SIZE_16` (device log: `font_size=16 on 'dankbot_msg'`), the short quip returns to 30 px, and the marquee path is untouched. Left: eyeball 16 px across the desk, and re-check on an LED matrix. |
 
 ## Testing strategy (as built)
 

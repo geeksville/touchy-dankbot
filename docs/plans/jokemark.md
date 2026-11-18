@@ -1,12 +1,12 @@
-# voicebot — plan: jokemark (a model bake-off for the quip stage)
+# dank-bot — plan: jokemark (a model bake-off for the quip stage)
 
 **Where this sits.** This extends Stage 1/2 of
-[`initial.md`](initial.md) — the responder CLI (`voicebot reply` /
-`voicebot models`). It replaces the ad-hoc loop of
+[`initial.md`](initial.md) — the responder CLI (`dank-bot reply` /
+`dank-bot models`). It replaces the ad-hoc loop of
 
 ```sh
-voicebot reply -f sim-overheard.txt --model A | tee a.txt
-voicebot reply -f sim-overheard.txt --model B | tee b.txt
+dank-bot reply -f sim-overheard.txt --model A | tee a.txt
+dank-bot reply -f sim-overheard.txt --model B | tee b.txt
 # … eyeball two loose text files, forget which temperature they used
 ```
 
@@ -20,31 +20,31 @@ the bake-off never needs one.
 
 > **Status: DONE (2026-11-17).** Implemented as planned:
 >
-> * **Assets** — `src/voicebot/assets/overheard.txt` (36 unique lines: the six
+> * **Assets** — `src/dankbot/assets/overheard.txt` (36 unique lines: the six
 >   `sim-overheard.txt` smoke lines verbatim + 30 restaurant/dinner-party lines)
->   and `src/voicebot/assets/jokemark-models.toml` (Hermes-3 8B + Human-Like
+>   and `src/dankbot/assets/jokemark-models.toml` (Hermes-3 8B + Human-Like
 >   Mistral Nemo 12B, each at the default sampler and with a temperature
->   variant). `pyproject.toml` includes `src/voicebot/assets`; `just build` was
+>   variant). `pyproject.toml` includes `src/dankbot/assets`; `just build` was
 >   verified — both the wheel and the sdist contain the two files.
-> * **Core** — `src/voicebot/jokemark.py`: `ModelSpec` / `LineResult` /
+> * **Core** — `src/dankbot/jokemark.py`: `ModelSpec` / `LineResult` /
 >   `ModelResult`, strict `load_matrix`, `load_lines`, `run_benchmark` (pull,
 >   model-outer, abort-the-bank-on-error, per-row latency, partial results via
 >   `on_result`) and `render_markdown`.
 > * **Fetching** — `ChatClient.has_model` (tolerates implicit `:latest`) and
 >   `ChatClient.pull_model` (`POST /api/pull` `{"model", "stream": false}`),
 >   with `DEFAULT_PULL_TIMEOUT = 3600.0`.
-> * **CLI** — `voicebot jokemark` with `--models`, `-f/--lines`, `-o/--out`,
+> * **CLI** — `dank-bot jokemark` with `--models`, `-f/--lines`, `-o/--out`,
 >   `--url`, `--native`, `--timeout`, `--pull/--no-pull`, `--limit`,
 >   `--persona`, `--persona-file`, `--dry-run`; `just jokemark`.
 > * **Optional display (2026-11-17)** — `run_benchmark` takes a `display` sink
->   (`voicebot.display.DisplaySink`) and hands it each non-skip reply's
->   `Reply.runs` — the same parsed runs `voicebot listen` scrolls. `voicebot
+>   (`dankbot.display.DisplaySink`) and hands it each non-skip reply's
+>   `Reply.runs` — the same parsed runs `dank-bot listen` scrolls. `dank-bot
 >   jokemark` probes for a touchy-pad **once** at the start (`PadDisplay.start()`
 >   now returns whether anything was drawn) and passes `PadDisplay.show` only if
 >   one answers; a missing pad is ignored after one warning, so a long run does
 >   not retry the USB bus per reply. A pad lost mid-run is dropped and
 >   reconnected as in `listen`, and a failing sink is logged, never fatal.
->   `--display-mode` (env `VOICEBOT_DISPLAY_MODE`) picks auto/scroll/multiline.
+>   `--display-mode` (env `DANKBOT_DISPLAY_MODE`) picks auto/scroll/multiline.
 > * **Docs** — README "Model bake-off (jokemark)", AGENTS layout/commands,
 >   `.clinerules/plans.md` index; `jokemark.md` gitignored as an artifact.
 > * **Matrix update (2026-11-17)** — added four newer candidates at `Q4_K_M`
@@ -66,7 +66,7 @@ the bake-off never needs one.
 > * **JSON sidecar + playback (2026-11-17)** — every run now also writes
 >   `<out>.json` beside the Markdown (`jokemark.json` by default): the same
 >   data, versioned, with replies *untruncated* and their colour runs included
->   (`render_json` / `load_report`). `voicebot jokemark --playback FILE` replays
+>   (`render_json` / `load_report`). `dank-bot jokemark --playback FILE` replays
 >   a report — no server, no model: each entry is logged (`label · overheard →
 >   REPLY: …` in its display colours, `SKIP(/notfunny)` for declines) and every
 >   non-skip reply is drawn on an attached pad, one second apart
@@ -90,12 +90,12 @@ the bake-off never needs one.
 
 ## Goal / summary
 
-`voicebot jokemark` should:
+`dank-bot jokemark` should:
 
 1. read a longer **overheard corpus** shipped inside the package
-   (`voicebot/assets/overheard.txt`) — the six current `sim-overheard.txt`
+   (`dankbot/assets/overheard.txt`) — the six current `sim-overheard.txt`
    lines plus ~30 typical restaurant / dinner-party lines;
-2. read a **model matrix** from TOML (`voicebot/assets/jokemark-models.toml`),
+2. read a **model matrix** from TOML (`dankbot/assets/jokemark-models.toml`),
    so a model entry can carry sampler parameters, not just a name;
 3. iterate the matrix, **pulling** each model through Ollama's `/api/pull` when
    the server does not already have it;
@@ -140,13 +140,13 @@ set — it must not inherit `--model` / `--temperature` etc., because the matrix
 owns those.
 
 ```
-voicebot jokemark [OPTIONS]
+dank-bot jokemark [OPTIONS]
 
   --models FILE        TOML matrix (default: packaged jokemark-models.toml)
   -f, --lines FILE     overheard corpus (default: packaged overheard.txt)
   -o, --out FILE       Markdown report (default: ./jokemark.md); <out>.json is its sidecar
   --playback FILE      replay a saved <out>.json (no server) to the log and pad
-  --url URL            Ollama server (default: $VOICEBOT_URL / DEFAULT_URL)
+  --url URL            Ollama server (default: $DANKBOT_URL / DEFAULT_URL)
   --native             talk to /api/chat instead of /v1 (matrix may override)
   --timeout S          per-request chat timeout (default: DEFAULT_TIMEOUT)
   --pull / --no-pull   fetch missing models first (default: --pull)
@@ -177,13 +177,13 @@ are data, not a crash); **1** when the matrix/corpus cannot be loaded, or no
 model produced a single reply. A run that fails still writes its report, so the
 failure is inspectable. Bad `--models` / `-f` paths are ordinary click errors.
 The options follow the repo convention — `--url`, `--native` and `--timeout`
-read the same `VOICEBOT_URL` / `VOICEBOT_NATIVE` / `VOICEBOT_TIMEOUT` env vars
+read the same `DANKBOT_URL` / `DANKBOT_NATIVE` / `DANKBOT_TIMEOUT` env vars
 as `reply` and `listen`.
 
 ## Data: the packaged assets
 
 ```
-src/voicebot/assets/
+src/dankbot/assets/
 ├── overheard.txt            # 6 existing lines + ~30 restaurant/dinner-party lines
 └── jokemark-models.toml     # the model/parameter matrix (comments welcome)
 ```
@@ -195,13 +195,13 @@ with `importlib.resources`:
 from importlib import resources
 
 def packaged_text(name: str) -> str:
-    return (resources.files("voicebot") / "assets" / name).read_text(encoding="utf-8")
+    return (resources.files("dank-bot") / "assets" / name).read_text(encoding="utf-8")
 ```
 
-`files("voicebot") / "assets" / …` works for an installed wheel (including a
+`files("dank-bot") / "assets" / …` works for an installed wheel (including a
 zipped one) and for an editable install; the assets directory does **not** need
 an `__init__.py`. `pyproject.toml` gets an explicit
-`include = [{ path = "src/voicebot/assets", format = ["sdist", "wheel"] }]`
+`include = [{ path = "src/dankbot/assets", format = ["sdist", "wheel"] }]`
 under `[tool.poetry]` so packaging never depends on Poetry's "data files inside
 a package are automatic" behaviour; P1's acceptance step unzips the wheel to
 prove the two files are in it.
@@ -277,7 +277,7 @@ temperature = 1.0
 * **Per-entry keys:** `model` (required), `label` (optional, must be unique),
   `temperature`, `min_p`, `ctx`, `max_tokens`, `native`, `timeout`.
   Missing sampler values come from `defaults`, then from
-  `voicebot.config` (`DEFAULT_TEMPERATURE`, …).
+  `dankbot.config` (`DEFAULT_TEMPERATURE`, …).
 * **`label`** is the report's heading key; when absent it is derived from the
   model path (`…/Hermes-3-Llama-3.1-8B-GGUF:latest` → `hermes-3-llama-3.1-8b`).
   Derived labels that collide are an error, not a silent merge.
@@ -300,7 +300,7 @@ def has_model(self, name: str) -> bool:
     """True if *name* is already pulled (tolerating Ollama's implicit ':latest')."""
 
 def pull_model(self, name: str, *, timeout: float = DEFAULT_PULL_TIMEOUT) -> None:
-    """POST {url}/api/pull {"model": name, "stream": false}; VoicebotError on failure."""
+    """POST {url}/api/pull {"model": name, "stream": false}; DankbotError on failure."""
 ```
 
 * `has_model` compares against `list_models()` with the `:latest` suffix
@@ -316,7 +316,7 @@ def pull_model(self, name: str, *, timeout: float = DEFAULT_PULL_TIMEOUT) -> Non
   that `has_model` does not see is recorded as `not pulled (--no-pull)` and its
   bank is skipped.
 * `pull_model` uses `requests` directly (already a dependency for the native
-  `/api/chat` path) and normalises everything to `VoicebotError`, matching
+  `/api/chat` path) and normalises everything to `DankbotError`, matching
   `server.py`'s existing style.
 
 ## The run loop
@@ -340,7 +340,7 @@ for spec in matrix:                      # matrix order, one model loaded at a t
 * **Sequential, no concurrency.** Ollama serves this box one generation at a
   time; firing 36 requests in parallel would just queue and make the latencies
   meaningless.
-* **Per-line failure policy:** the first `VoicebotError` inside a model's bank
+* **Per-line failure policy:** the first `DankbotError` inside a model's bank
   is recorded and aborts *that bank* (server down / model unloaded). The next
   matrix entry still gets its chance. This avoids 36 consecutive 120 s timeouts
   when the server has gone away.
@@ -410,15 +410,15 @@ truncation: a versioned header (`url`, `corpus`, `persona`, `native`,
 
 | File | Change |
 |---|---|
-| `src/voicebot/assets/overheard.txt` | **new** — 6 old lines + ~30 restaurant/dinner-party lines. |
-| `src/voicebot/assets/jokemark-models.toml` | **new** — the matrix above. |
-| `src/voicebot/jokemark.py` | **new** — `ModelSpec`, `load_matrix`, `load_lines`, `run_benchmark`, `render_markdown`, plus the JSON sidecar (`render_json` / `load_report`) and `playback`. Pure, network-free, no click. |
-| `src/voicebot/server.py` | add `has_model` + `pull_model` (+ the pull timeout argument). |
-| `src/voicebot/config.py` | add `DEFAULT_PULL_TIMEOUT`. |
-| `src/voicebot/cli.py` | add the `jokemark` command (thin: options → `load_*` / `run_benchmark` → `render_markdown` + `render_json` → write both files; `--playback` → `load_report` → `playback`); document it in the module docstring. |
-| `src/voicebot/logs.py` | `playback_line`: the dim `label · overheard →` prefix plus the quip in its display colours. |
-| `pyproject.toml` | explicit `include` for `src/voicebot/assets`. |
-| `justfile` | `jokemark *args: install` → `poetry run voicebot jokemark {{args}}`; comment the manual workflow it replaces. |
+| `src/dankbot/assets/overheard.txt` | **new** — 6 old lines + ~30 restaurant/dinner-party lines. |
+| `src/dankbot/assets/jokemark-models.toml` | **new** — the matrix above. |
+| `src/dankbot/jokemark.py` | **new** — `ModelSpec`, `load_matrix`, `load_lines`, `run_benchmark`, `render_markdown`, plus the JSON sidecar (`render_json` / `load_report`) and `playback`. Pure, network-free, no click. |
+| `src/dankbot/server.py` | add `has_model` + `pull_model` (+ the pull timeout argument). |
+| `src/dankbot/config.py` | add `DEFAULT_PULL_TIMEOUT`. |
+| `src/dankbot/cli.py` | add the `jokemark` command (thin: options → `load_*` / `run_benchmark` → `render_markdown` + `render_json` → write both files; `--playback` → `load_report` → `playback`); document it in the module docstring. |
+| `src/dankbot/logs.py` | `playback_line`: the dim `label · overheard →` prefix plus the quip in its display colours. |
+| `pyproject.toml` | explicit `include` for `src/dankbot/assets`. |
+| `justfile` | `jokemark *args: install` → `poetry run dank-bot jokemark {{args}}`; comment the manual workflow it replaces. |
 | `README.md` | a “Model bake-off” subsection; demote `reply -f sim-overheard.txt` to a smoke example. |
 | `AGENTS.md` | one row in the repo-layout table for `jokemark.py` + the assets dir. |
 | `tests/test_jokemark.py` | **new** — loaders, runner, Markdown + JSON renderers, `load_report` validation, playback (pad + pause), packaged-asset invariants. |
@@ -470,10 +470,10 @@ in `test_cli.py`, so tests never pull or chat for real.
 
 | Phase | Work | Acceptance |
 |---|---|---|
-| **P1 — assets** | Write `overheard.txt` (6 + ~30 unique restaurant/dinner-party lines) and `jokemark-models.toml` (2 models + 2 sampler variants); add the `pyproject.toml` include. | `python -c` reads both via `importlib.resources`; `just build` + `unzip -l dist/touchy_voicebot-*.whl` shows both files; asset tests green. |
-| **P2 — fetch primitives** | `DEFAULT_PULL_TIMEOUT`, `ChatClient.has_model` / `pull_model`, `tests/test_server.py`. | Unit tests prove the `/api/pull` payload, `:latest` matching, and `VoicebotError` normalisation; live check pulls an already-present model (fast no-op). |
+| **P1 — assets** | Write `overheard.txt` (6 + ~30 unique restaurant/dinner-party lines) and `jokemark-models.toml` (2 models + 2 sampler variants); add the `pyproject.toml` include. | `python -c` reads both via `importlib.resources`; `just build` + `unzip -l dist/dankbot-*.whl` shows both files; asset tests green. |
+| **P2 — fetch primitives** | `DEFAULT_PULL_TIMEOUT`, `ChatClient.has_model` / `pull_model`, `tests/test_server.py`. | Unit tests prove the `/api/pull` payload, `:latest` matching, and `DankbotError` normalisation; live check pulls an already-present model (fast no-op). |
 | **P3 — jokemark core** | `jokemark.py` (loaders + validation, runner with the error policy, Markdown renderer) and `tests/test_jokemark.py` with a recording fake client. | All tests network-free; renderer output contains one summary row per spec, stable row numbers, skip/error markers, and escaped `|`/newlines. |
-| **P4 — CLI + docs** | `voicebot jokemark` wiring, `just jokemark`, README/AGENTS updates, CLI tests (`--dry-run`, `--no-pull`, `--limit`, `-o`). | `just lint` clean; `just test` green; `voicebot jokemark --dry-run` prints 4 specs × 36 lines and writes nothing. |
+| **P4 — CLI + docs** | `dank-bot jokemark` wiring, `just jokemark`, README/AGENTS updates, CLI tests (`--dry-run`, `--no-pull`, `--limit`, `-o`). | `just lint` clean; `just test` green; `dank-bot jokemark --dry-run` prints 4 specs × 36 lines and writes nothing. |
 | **P5 — live baseline** | Real run against the server (`just jokemark`), inspect the report, record the outcome (and, if useful, keep one report in `docs/` as the baseline the next run is compared against). | `jokemark.md` has every section filled; timings and skip rates look sane; the two known models produce recognisably different quips. |
 
 P1–P4 are one small PR-sized change; P5 is a human-supervised live run (it
@@ -490,7 +490,7 @@ downloads models).
   through `importlib.resources`.
 * `run_benchmark` with a recording fake: one result per spec/line; a
   `/notfunny` reply lands as `skip=True`; a missing model with `pull=False`
-  records an error without chat calls; a mid-bank `VoicebotError` stops that
+  records an error without chat calls; a mid-bank `DankbotError` stops that
   bank only and the next spec still runs; latency is recorded (> 0).
 * `render_markdown`: summary row count, section order = matrix order, raw
   commands visible, skip marker present, `|` and newlines escaped, error block
@@ -504,7 +504,7 @@ downloads models).
   `--no-pull` never calls `pull_model`; `--dry-run` writes nothing;
   `--models`/`-f` overrides are honoured; a bad matrix exits 1 with a message.
 
-**Live (opt-in, `VOICEBOT_LIVE=1`):**
+**Live (opt-in, `DANKBOT_LIVE=1`):**
 
 * Keep it cheap: one already-pulled model × `--limit 1` through the same code
   path, asserting a reply or a skip — no pulls in CI, no multi-GB downloads.
@@ -519,7 +519,7 @@ next default model without consulting shell history.
 | Decision | Choice | Why |
 |---|---|---|
 | Command shape | a `jokemark` **subcommand** | One command per stage, like `reply` / `models` / `listen`; the matrix owns model/sampler options, so inheriting `_LLM_OPTIONS` would be misleading. |
-| Corpus location | packaged `src/voicebot/assets/` | Works from a wheel on the Pi, not just from a source checkout; `importlib.resources` avoids `__file__` path games. |
+| Corpus location | packaged `src/dankbot/assets/` | Works from a wheel on the Pi, not just from a source checkout; `importlib.resources` avoids `__file__` path games. |
 | Corpus size/shape | ~36 bare, unique, lowercase utterances | Enough to expose `/notfunny` and formatting failures; bare utterances match what STT actually produces. |
 | Matrix format | TOML envelope (`version`/`[defaults]`/`[[models]]`) | Parameters per row without a CLI flag explosion; room for personas/repeats/seeds later. TOML (stdlib `tomllib`) over JSON so the hand-edited file can carry comments, and over YAML so no dependency is added. |
 | Initial entries | Hermes-3 8B + Human-Like Nemo 12B, each at the default sampler and one temperature variant | Exactly what has been evaluated by hand, plus an A/B that exercises the parameter axis. |

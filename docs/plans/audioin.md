@@ -1,4 +1,4 @@
-# voicebot — plan: audio in (mic → VAD → speech-to-text)
+# dank-bot — plan: audio in (mic → VAD → speech-to-text)
 
 **Where this sits.** This is the **"audio in" half of
 [`initial.md`](initial.md)'s Stage 4** (mic capture + VAD + speech-to-text),
@@ -9,7 +9,7 @@ The display stays deferred, so this stage's only output is **log lines**: the
 text we heard and the reply the model produced are logged exactly as they would
 later be scrolled on the matrix.
 
-> **Status: IMPLEMENTED (Stage 4a — "audio in").** A new `voicebot listen`
+> **Status: IMPLEMENTED (Stage 4a — "audio in").** A new `dank-bot listen`
 > command drives a `TranscriptSource` seam (the mic via Moonshine
 > `MicTranscriber`, or a `--fake` replay) through the `UtteranceGate` into the
 > existing `Responder`, emitting `HEARD:` / `SKIP(…)` / `REPLY:` log lines (or
@@ -27,7 +27,7 @@ later be scrolled on the matrix.
 > `hw:2,0` — so **no `libasound2-plugins` was needed**); **(5)** worker thread +
 > bounded queue (one in flight + one pending, drop-oldest as the safety valve;
 > `--fake` runs inline for deterministic replay); **(6)** a new
-> `voicebot listen`; **(7)** confirmed 16 kHz / 2-ch / S16_LE, mono capture;
+> `dank-bot listen`; **(7)** confirmed 16 kHz / 2-ch / S16_LE, mono capture;
 > **(8)** `models_from`/cache for offline; **(9)** 5 s debounce + `NOTFUNNY`
 > backstop.
 
@@ -46,7 +46,7 @@ later be scrolled on the matrix.
   [ min-words gate ]  ("at least a few words", else drop)   ← THIS PLAN
             │  a phrase worth answering
             ▼
-  [ voicebot responder ]      (already built: src/voicebot/responder.py)
+  [ dank-bot responder ]      (already built: src/dankbot/responder.py)
             │  a one-to-two-sentence quip, or NOTFUNNY
             ▼
   [ log it ]   (log.info("HEARD: …"), log.info("REPLY: …"))  ← THIS PLAN
@@ -54,7 +54,7 @@ later be scrolled on the matrix.
   [ touchy-pad LED matrix ]   (Stage 3 — DEFERRED, not in this plan)
 ```
 
-The deliverable is a new long-running command, `voicebot listen`, that opens the
+The deliverable is a new long-running command, `dank-bot listen`, that opens the
 mic, transcribes speech in (near-)real time, keeps only utterances with enough
 words to be worth riffing on, asks the existing `Responder` for a quip, and
 **logs** both sides of the exchange. Nothing is sent to the LED matrix yet — the
@@ -78,7 +78,7 @@ thing Stage 3 will later hand to the display.
 
 * **No display output** — the touchy-pad LED matrix is Stage 3, deferred; this
   plan does not add a `touchy_pad` dependency and adds no `display.py`.
-* **No text-to-speech / no talking back** — voicebot is ears-only for now.
+* **No text-to-speech / no talking back** — dank-bot is ears-only for now.
 * **No wake word, no diarization/speaker ID, no "interestingness" classifier** —
   we lean solely on the utterance gate + the existing `NOTFUNNY` backstop
   (`initial.md` Stage 4's optional classifier stays optional).
@@ -90,7 +90,7 @@ thing Stage 3 will later hand to the display.
 
 ## Touchy-pad specifics
 
-* **Which side(s):** `tools/voicebot/` **only**. No `firmware/`, `app/`, `rust/`
+* **Which side(s):** `tools/dankbot/` **only**. No `firmware/`, `app/`, `rust/`
   or `proto/` changes.
 * **Wire version:** **none moves.** This is a pure host-side consumer; it does
   not even import `touchy_pad` yet (Stage 3 will).
@@ -105,7 +105,7 @@ thing Stage 3 will later hand to the display.
 
 ## Approach
 
-One new long-running command, `voicebot listen`, wraps a small pipeline whose
+One new long-running command, `dank-bot listen`, wraps a small pipeline whose
 stages are each a separate, individually testable object:
 
 ```
@@ -126,7 +126,7 @@ iterator/generator of finished utterances. `listen.py` depends only on that seam
 so every test runs against a `FakeTranscriptSource` (a scripted list of lines)
 with a fake `chat_fn`, and **CI never touches a mic, the network, or Moonshine**.
 
-`voicebot listen` reuses the `reply` command's config surface (`--url`, `--model`,
+`dank-bot listen` reuses the `reply` command's config surface (`--url`, `--model`,
 `--persona`, `--temperature`, `--min-p`, `--ctx`, `--max-tokens`, `--native`,
 `--json`, `--no-notfunny`) and adds audio-shaped flags (`--device`, `--model-arch`,
 `--min-words`, …). `reply` (text-in, quip-out) stays exactly as it is — it is the
@@ -202,10 +202,10 @@ that means **no `ort_providers`** (Moonshine's docs: *"Unset means CPU-only
 ## File & component layout
 
 ```
-tools/voicebot/
+tools/dankbot/
   pyproject.toml            + moonshine-voice, sounddevice deps
   justfile                  + `listen` recipe
-  src/voicebot/
+  src/dankbot/
     audio.py       NEW   AudioIn: owns the mic + a Moonshine streaming session;
                          yields finished utterances. The ONLY module that imports
                          moonshine_voice / sounddevice.
@@ -216,7 +216,7 @@ tools/voicebot/
                          Imports neither mic nor model (inject the source + a chat_fn).
     config.py      EDIT  add audio settings (device, model_arch, min_words, rate limit)
                          + their defaults/env names.
-    cli.py         EDIT  new `voicebot listen` command (reuses the `reply` options).
+    cli.py         EDIT  new `dank-bot listen` command (reuses the `reply` options).
     responder.py   —     unchanged (reused).
     persona.py     —     unchanged.
     server.py      —     unchanged.
@@ -247,7 +247,7 @@ first phase needs no mic and no model at all.
 
 * **A0 — skeleton + the seam (no audio, no model).**
   Add `TranscriptSource` + `FakeTranscriptSource`, `gate.py`, `listen.py`, and
-  `voicebot listen` wired only to the fake source. `just listen -- --fake
+  `dank-bot listen` wired only to the fake source. `just listen -- --fake
   file.txt` replays a text file through the gate + responder and logs — the
   end-to-end loop, with zero hardware. Tests: `test_gate.py`, `test_listen.py`.
 * **A1 — real capture, no STT.** `AudioIn` opens `sounddevice` on the chosen
@@ -280,7 +280,7 @@ first phase needs no mic and no model at all.
   the fake source and asserts the same outcomes.
 * **Gate unit tests** — word counting (punctuation, contractions), filler-only
   ("uh huh", "hmm"), the debounce window, and the "at least a few words" line.
-* **Opt-in live tests** — extend the existing `VOICEBOT_LIVE=1` idea with a new
+* **Opt-in live tests** — extend the existing `DANKBOT_LIVE=1` idea with a new
   `@pytest.mark.audio` (or `live`) test that opens the real mic + model and
   asserts one utterance comes back; skipped by default, run by hand in the
   container and on the Pi.
@@ -357,7 +357,7 @@ has the options, the trade-off, and my recommendation.
    (drop-oldest) so a slow/absent server can't back up the audio. **Agree?**
    (Alternative: inline call and accept the stall — simpler, worse.)
 
-6. **Command shape + stage framing.** A **new `voicebot listen`** command (leaving
+6. **Command shape + stage framing.** A **new `dank-bot listen`** command (leaving
    `reply` untouched as the responder's regression harness), framed as **Stage 4a
    ("audio in") landing ahead of Stage 3 (display)**. **Good — or would you rather
    fold this into `reply`?**
@@ -398,7 +398,7 @@ has the options, the trade-off, and my recommendation.
 
 ## Acceptance criteria (definition of done)
 
-1. `voicebot listen` runs end-to-end on the container + XVF3800: spoken
+1. `dank-bot listen` runs end-to-end on the container + XVF3800: spoken
    sentences produce `HEARD: …` / `REPLY: …` log lines; short/filler utterances
    log as skipped and do **not** hit the LLM.
 2. `just test` green **with no mic, no network and no model** (the fake-source

@@ -2,7 +2,7 @@
 
 Log records still go to **stderr**, and they are rendered with `rich`_ so the
 terminal mirrors the LED matrix: a quip is printed in the very colours
-:mod:`voicebot.display` scrolls for it, which makes colour debugging possible
+:mod:`dankbot.display` scrolls for it, which makes colour debugging possible
 without looking at the pad.
 
 Only the *presentation* changes. Every record's message is still the plain
@@ -13,7 +13,7 @@ the colours by itself when the output is a pipe or ``NO_COLOR`` is set.
 The pieces:
 
 * :func:`configure` — install the rich handler on the root logger (once per
-  process; called from ``voicebot.cli.main``), replacing ``logging.basicConfig``;
+  process; called from ``dankbot.cli.main``), replacing ``logging.basicConfig``;
 * :func:`enable_debug` / :func:`ensure_verbosity` — the level changes behind the
   ``--debug`` flag;
 * :func:`heard_line` / :func:`skip_line` / :func:`reply_line` — build the
@@ -133,7 +133,7 @@ def make_handler(*, level: int = logging.NOTSET, console: Console | None = None)
 
     *level* defaults to ``NOTSET``: as with ``basicConfig``, it is the *root
     logger's* level (set by :func:`configure`) that decides what is emitted, so a
-    ``voicebot`` logger raised to INFO (``voicebot listen``) still gets through.
+    ``dankbot`` logger raised to INFO (``dank-bot listen``) still gets through.
     """
     return _Handler(
         level=level,
@@ -159,25 +159,25 @@ def configure(level: int = DEFAULT_LEVEL) -> None:
 
 
 def enable_debug() -> None:
-    """``--debug``: let DEBUG records through, for the root and ``voicebot`` loggers.
+    """``--debug``: let DEBUG records through, for the root and ``dankbot`` loggers.
 
     The rich handler sits on the root logger with level ``NOTSET``, so the root
-    logger decides what is emitted; ``voicebot`` is pinned too because the
+    logger decides what is emitted; ``dankbot`` is pinned too because the
     commands normally raise it to INFO and a logger's own level caps what it
-    passes on (a ``voicebot`` logger at INFO would hide its DEBUG records).
+    passes on (a ``dankbot`` logger at INFO would hide its DEBUG records).
     """
     logging.getLogger().setLevel(logging.DEBUG)
-    logging.getLogger("voicebot").setLevel(logging.DEBUG)
+    logging.getLogger("dankbot").setLevel(logging.DEBUG)
 
 
 def ensure_verbosity(level: int = logging.INFO) -> None:
-    """Make the ``voicebot`` logger at least as verbose as *level*, never quieter.
+    """Make the ``dankbot`` logger at least as verbose as *level*, never quieter.
 
     ``listen`` / ``jokemark`` call this for INFO because their ``HEARD`` /
     ``SKIP`` / ``REPLY`` records are informational. After ``--debug`` the root
-    and ``voicebot`` loggers are already at DEBUG, so this must **not** raise
+    and ``dankbot`` loggers are already at DEBUG, so this must **not** raise
     them back to INFO — only lower a level (or leave it inheriting from root).
     """
-    logger = logging.getLogger("voicebot")
+    logger = logging.getLogger("dankbot")
     if logger.getEffectiveLevel() > level:
         logger.setLevel(level)

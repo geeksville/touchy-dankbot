@@ -1,6 +1,6 @@
 """The ``/command`` contract: directives embedded in the model's output.
 
-Any *recognised* command word in the LLM's reply is a directive to voicebot and
+Any *recognised* command word in the LLM's reply is a directive to dank-bot and
 is never displayed. Two commands exist today:
 
 * ``/notfunny`` — the model has nothing worth saying; suppress the whole reply.

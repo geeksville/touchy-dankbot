@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from voicebot.commands import (
+from dankbot.commands import (
     COLOURS,
     EMPHASIS_COLOURS,
     PINK,

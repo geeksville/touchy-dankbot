@@ -1,15 +1,15 @@
 """The audio-in loop: utterances -> gate -> responder -> emit(log) + display.
 
-Framework-free and hardware-free: it drives a :class:`~voicebot.audio.
-TranscriptSource` through an :class:`~voicebot.gate.UtteranceGate` and an
-injected :class:`~voicebot.responder.Responder`, calling ``respond`` on a
+Framework-free and hardware-free: it drives a :class:`~dankbot.audio.
+TranscriptSource` through an :class:`~dankbot.gate.UtteranceGate` and an
+injected :class:`~dankbot.responder.Responder`, calling ``respond`` on a
 **worker thread** so the audio side never blocks on the LLM round-trip
 (when the worker is busy the *older* pending utterance is dropped in favour of
 the newest). ``inline=True`` runs it synchronously — tests use that for
 deterministic ordering.
 
 Two sinks fire per event: ``emit`` (log / ``--json``, always) and ``display``
-(optional — :mod:`voicebot.display`'s pad, only on a ``KIND_REPLY``).
+(optional — :mod:`dankbot.display`'s pad, only on a ``KIND_REPLY``).
 
 See ``docs/plans/audioin.md`` and ``docs/plans/ledout.md``.
 """
@@ -67,7 +67,7 @@ Emitter = Callable[[ListenEvent], None]
 def log_emitter(event: ListenEvent) -> None:
     """The default emitter: ``HEARD`` / ``REPLY`` / ``SKIP`` log lines.
 
-    The lines are :mod:`rich` texts (see :mod:`voicebot.logs`), so a ``REPLY``
+    The lines are :mod:`rich` texts (see :mod:`dankbot.logs`), so a ``REPLY``
     shows the quip in the colours the display scrolls while its plain text stays
     ``REPLY: …``.
     """
@@ -118,7 +118,7 @@ class Listener:
     def _start(self) -> None:
         if self._inline or self._thread is not None:
             return
-        self._thread = threading.Thread(target=self._worker, name="voicebot-reply", daemon=True)
+        self._thread = threading.Thread(target=self._worker, name="dank-bot-reply", daemon=True)
         self._thread.start()
 
     def close(self) -> None:

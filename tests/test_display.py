@@ -11,8 +11,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from voicebot.commands import COLOURS, WHITE, Run
-from voicebot.display import (
+from dankbot.commands import COLOURS, WHITE, Run
+from dankbot.display import (
     DEFAULT_SCROLL_SPEED_PX_S,
     FONT_PROPERTY,
     FONT_SIZES,
@@ -93,7 +93,7 @@ class FakePad:
 
 
 def saved_label(pad: FakePad, index: int = 0):
-    """The voicebot label from the *index*th screen the fake pad saved.
+    """The dank-bot label from the *index*th screen the fake pad saved.
 
     Needs the host library for the protobuf round-trip, so callers use
     ``pytest.importorskip`` first (this helper does it too, harmlessly).
@@ -211,7 +211,7 @@ def test_emoji_are_stripped_by_default():
 
 def test_the_emoji_fold_can_be_switched_off(monkeypatch):
     # Once the device font has emoji glyphs, flipping STRIP_EMOJI keeps them.
-    monkeypatch.setattr("voicebot.display.STRIP_EMOJI", False)
+    monkeypatch.setattr("dankbot.display.STRIP_EMOJI", False)
     assert to_markup([Run("🤔 I bet 💪")]) == "🤔 I bet 💪"
     assert to_markup([Run("🤔 Danger! 💪", COLOURS["red"])]) == "#FF0000 🤔 Danger! 💪#"
 
@@ -315,7 +315,7 @@ def test_show_sends_one_text_override_and_builds_the_screen_once():
     PadDisplay(pad, clear_after=0).show([Run("Danger!", COLOURS["red"])])
     assert pad.texts() == ["#FF0000 Danger!#"]
     assert len(pad.saved) == 1
-    assert pad.loaded == ["F:host/s/voicebot.pb"]
+    assert pad.loaded == ["F:host/s/dank-bot.pb"]
 
 
 def test_start_shows_the_banner():
@@ -497,7 +497,7 @@ def test_a_pad_without_the_font_override_still_shows_the_quip():
 
 def test_connect_retries_once_on_a_transient_failure(monkeypatch):
     """A bad first response (stale device frame) self-heals on the retry."""
-    from voicebot import display as display_mod
+    from dankbot import display as display_mod
 
     calls: list[int] = []
 
@@ -515,7 +515,7 @@ def test_connect_retries_once_on_a_transient_failure(monkeypatch):
 
 
 def test_connect_gives_up_after_the_allowed_attempts(monkeypatch, caplog):
-    from voicebot import display as display_mod
+    from dankbot import display as display_mod
 
     calls: list[int] = []
 
@@ -544,7 +544,7 @@ def test_show_and_start_report_whether_a_pad_was_drawn():
 
 
 def test_show_and_start_are_false_without_a_pad(monkeypatch):
-    from voicebot import display as display_mod
+    from dankbot import display as display_mod
 
     def no_pad():
         raise RuntimeError("no pad")

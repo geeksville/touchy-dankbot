@@ -17,8 +17,8 @@ from touchy_pad.api import LongMode
 from touchy_pad.sim.device import _find_widget
 from touchy_pad.sim.server import SimServer
 
-from voicebot.commands import COLOURS, Run
-from voicebot.display import LABEL_ID, STARTUP_TEXT, PadDisplay
+from dankbot.commands import COLOURS, Run
+from dankbot.display import LABEL_ID, STARTUP_TEXT, PadDisplay
 
 
 @pytest.fixture
@@ -48,7 +48,7 @@ def test_a_coloured_quip_lands_on_the_simulated_panel(sim):
     try:
         display.show([Run("Danger!", COLOURS["red"])])
         label = _label(sim)
-        assert label is not None, "the voicebot label was never built"
+        assert label is not None, "the dank-bot label was never built"
         assert label.label.text == "#FF0000 Danger!#"
         assert label.label.recolor is True
     finally:
@@ -68,7 +68,7 @@ def test_the_banner_shows_then_an_empty_quip_clears(sim):
 
 def test_jokemark_pushes_each_reply_through_the_pad(sim):
     """jokemark's optional sink draws the same parsed runs ``listen`` shows."""
-    from voicebot.jokemark import ModelSpec, run_benchmark
+    from dankbot.jokemark import ModelSpec, run_benchmark
 
     class Backend:
         def has_model(self, name):
@@ -105,7 +105,7 @@ def test_a_tall_panel_gets_a_wrapped_text_field(lcd_sim):
     try:
         display.show([Run("Danger!", COLOURS["red"])])
         label = _label(lcd_sim)
-        assert label is not None, "the voicebot label was never built"
+        assert label is not None, "the dank-bot label was never built"
         assert label.label.text == "#FF0000 Danger!#"
         assert label.label.recolor is True
         assert label.label.long_mode == LongMode.LONG_MODE_DOTS
@@ -119,7 +119,7 @@ def test_a_long_quip_shrinks_the_font_on_the_lcd(lcd_sim):
     try:
         display.show([Run("x" * 200)])
         label = _label(lcd_sim)
-        assert label is not None, "the voicebot label was never built"
+        assert label is not None, "the dank-bot label was never built"
         assert any(style.font_size == 16 for style in label.styles)
     finally:
         display.close()
@@ -130,7 +130,7 @@ def test_a_short_quip_keeps_the_full_size_font(lcd_sim):
     try:
         display.show([Run("Short.")])
         label = _label(lcd_sim)
-        assert label is not None, "the voicebot label was never built"
+        assert label is not None, "the dank-bot label was never built"
         assert not any(style.font_size == 16 for style in label.styles)
     finally:
         display.close()

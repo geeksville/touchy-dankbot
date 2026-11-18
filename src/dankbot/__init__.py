@@ -1,4 +1,4 @@
-"""voicebot — witty one-liners about overheard conversation, via a remote LLM.
+"""dank-bot — witty one-liners about overheard conversation, via a remote LLM.
 
 This is the "responder" half of the parent repo's creep3r art project: it takes
 a snippet of overheard conversation and asks a small LLM (served remotely by

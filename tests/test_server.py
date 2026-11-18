@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from voicebot.config import DEFAULT_PULL_TIMEOUT, Settings
-from voicebot.server import ChatClient, VoicebotError
+from dankbot.config import DEFAULT_PULL_TIMEOUT, Settings
+from dankbot.server import ChatClient, DankbotError
 
 
 class FakeResponse:
@@ -30,7 +30,7 @@ def test_pull_model_posts_the_native_pull(monkeypatch):
         seen.update(url=url, json=json, timeout=timeout)
         return FakeResponse({"status": "success"})
 
-    monkeypatch.setattr("voicebot.server.requests.post", post)
+    monkeypatch.setattr("dankbot.server.requests.post", post)
     ChatClient(Settings(url="http://ollama:11434")).pull_model("hf.co/x/y:Q8_0")
     assert seen == {
         "url": "http://ollama:11434/api/pull",
@@ -46,7 +46,7 @@ def test_pull_model_accepts_a_custom_timeout(monkeypatch):
         seen.update(timeout=timeout)
         return FakeResponse()
 
-    monkeypatch.setattr("voicebot.server.requests.post", post)
+    monkeypatch.setattr("dankbot.server.requests.post", post)
     ChatClient(Settings()).pull_model("m", timeout=5)
     assert seen["timeout"] == 5.0
 
@@ -55,17 +55,17 @@ def test_pull_model_normalises_request_errors(monkeypatch):
     def post(*args, **kwargs):
         raise RuntimeError("nope")
 
-    monkeypatch.setattr("voicebot.server.requests.post", post)
-    with pytest.raises(VoicebotError, match="RuntimeError: nope"):
+    monkeypatch.setattr("dankbot.server.requests.post", post)
+    with pytest.raises(DankbotError, match="RuntimeError: nope"):
         ChatClient(Settings()).pull_model("m")
 
 
 def test_pull_model_reports_an_error_field(monkeypatch):
     monkeypatch.setattr(
-        "voicebot.server.requests.post",
+        "dankbot.server.requests.post",
         lambda *args, **kwargs: FakeResponse({"error": "model not found"}),
     )
-    with pytest.raises(VoicebotError, match="model not found"):
+    with pytest.raises(DankbotError, match="model not found"):
         ChatClient(Settings()).pull_model("m")
 
 
@@ -84,8 +84,8 @@ def test_has_model_surfaces_server_failures(monkeypatch):
     client = ChatClient(Settings())
 
     def boom():
-        raise VoicebotError("down")
+        raise DankbotError("down")
 
     monkeypatch.setattr(client, "list_models", boom)
-    with pytest.raises(VoicebotError, match="down"):
+    with pytest.raises(DankbotError, match="down"):
         client.has_model("a")

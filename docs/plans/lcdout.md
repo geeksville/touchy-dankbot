@@ -1,4 +1,4 @@
-# voicebot — plan: LCD out (one display, two text layouts)
+# dank-bot — plan: LCD out (one display, two text layouts)
 
 **Where this sits.** This extends `docs/plans/ledout.md` (Stage 3, *LED out*).
 That plan built `display.py` around a **single** full-panel scrolling label —
@@ -10,7 +10,7 @@ adds a second layout for *tall* panels, chosen automatically from
 > **Status: DONE (2026-11-17).** Implemented L1–L5: `display.py` resolves the
 > layout from `board_info`, builds either the marquee or the multiline field,
 > re-prepares when the panel changes, and `--display-mode` /
-> `VOICEBOT_DISPLAY_MODE` overrides the rule. `just lint` clean;
+> `DANKBOT_DISPLAY_MODE` overrides the rule. `just lint` clean;
 > `just test` **121 passed / 2 skipped** (fake-pad tests for both modes plus a
 > simulator run at 32×8 and 480×272).
 >
@@ -33,7 +33,7 @@ adds a second layout for *tall* panels, chosen automatically from
 ## Goal / vision
 
 ```
-  [ voicebot listen ]
+  [ dank-bot listen ]
      mic → gate → responder ──► Reply { runs }            (stage 4a / 1+2)
                                       │
                                       ▼
@@ -60,7 +60,7 @@ the screen the first time a panel is seen.
 * A per-connection re-check so swapping an LED pad for the LCD pad rebuilds the
   screen in the other mode.
 * A `--display-mode {auto,scroll,multiline}` escape hatch
-  (`VOICEBOT_DISPLAY_MODE`) for the odd panel the height rule gets wrong.
+  (`DANKBOT_DISPLAY_MODE`) for the odd panel the height rule gets wrong.
 * Tests for both geometries (fake pad + one simulator run per size) and a
   hardware pass on the attached `jc4827w543` **and** an LED matrix.
 * Doc/persona wording that stops promising a scrolling LED.
@@ -119,14 +119,14 @@ def resolve_mode(requested: str, height: int) -> str:
 ```
 
 * `PadDisplay(..., display_mode=MODE_AUTO)`; `--display-mode` is a click
-  `Choice(DISPLAY_MODES)`, `envvar="VOICEBOT_DISPLAY_MODE"`, default
+  `Choice(DISPLAY_MODES)`, `envvar="DANKBOT_DISPLAY_MODE"`, default
   `DEFAULT_DISPLAY_MODE = MODE_AUTO` in `config.py` (the repo's flag → env →
   default convention).
 * An unknown value is impossible through the CLI (click validates), but
   `resolve_mode` still treats anything unexpected as `auto` rather than raising —
   a bad env var must not stop a performance.
 * Log the decision once per connection:
-  `voicebot: display ready on 480x272 (jc4827w543, multiline, screen 'voicebot')`.
+  `dank-bot: display ready on 480x272 (jc4827w543, multiline, screen 'dank-bot')`.
 
 ### Re-check on reconnect
 
@@ -135,7 +135,7 @@ def resolve_mode(requested: str, height: int) -> str:
 re-prepares when a *new* connection reports a different `(width, height)` than
 the cached one. That is the swap case:
 
-1. `voicebot listen` starts with the LCD attached → multiline screen saved.
+1. `dank-bot listen` starts with the LCD attached → multiline screen saved.
 2. The LCD is unplugged; a write fails → `_forget_pad()` (existing behaviour).
 3. An LED matrix is plugged in; the next quip reconnects, sees `32x8`, rebuilds
    and saves the scrolling screen, then writes the quip.
@@ -281,7 +281,7 @@ def _write_quip(self, pad, runs) -> bool:
         self._write(pad, to_markup(runs))   # one `text` override
         return True
     except Exception as exc:                # a lost pad is not fatal
-        log.warning("voicebot: lost the touchy-pad (%s) — will reconnect", exc)
+        log.warning("dank-bot: lost the touchy-pad (%s) — will reconnect", exc)
         return False
 ```
 
@@ -290,7 +290,7 @@ def _write_quip(self, pad, runs) -> bool:
   `recolor=True`, so colour works on the LCD exactly as on the matrix.
 * `show([])` / the idle clear writes `""`, which blanks whichever layout is
   active. No mode-specific clearing.
-* The startup banner (`"I'm voicebot"`), lazy connect, retry-once, drop-the-pad
+* The startup banner (`"I'm dank-bot"`), lazy connect, retry-once, drop-the-pad
   and reconnect behaviour are all shared.
 * The lock still serialises the reply worker and the idle-clear timer; nothing
   about a second mode adds concurrency.
@@ -299,10 +299,10 @@ def _write_quip(self, pad, runs) -> bool:
 
 | File | Change |
 |---|---|
-| `src/voicebot/display.py` | **the whole feature.** New constants (`MODE_*`, `DISPLAY_MODES`, `PANEL_HEIGHT_THRESHOLD_PX`, `PANEL_PADDING_PX`, `MIN_PANEL_LINES`), `resolve_mode()`, `panel_inset()`, `font_for_panel()`; split `_prepare` into `_prepare` (read size → resolve mode → dispatch) + `_build_scroll_screen` + `_build_panel_screen`; cache `self._mode`; re-prepare when the reported size/mode changes; richer "display ready" log line. Keep `font_for`, `to_markup`, `PadDisplay.show` and the timer as they are. |
-| `src/voicebot/config.py` | `DEFAULT_DISPLAY_MODE = "auto"` (module-level string, not part of `Settings` — the display is CLI-only, like `--screen-name`). |
-| `src/voicebot/cli.py` | `--display-mode` on `listen` (`click.Choice(["auto", "scroll", "multiline"])`, `envvar="VOICEBOT_DISPLAY_MODE"`, `show_default=True`); pass it through `_make_display` → `PadDisplay(display_mode=...)`; help text states the height rule. |
-| `src/voicebot/persona.py` | "Your words will appear on a scrolling LED display" → "Your words will appear on a small display (an LED marquee or a small LCD panel)." Keep the <100-character guidance: it is what keeps the multiline field to a few lines. |
+| `src/dankbot/display.py` | **the whole feature.** New constants (`MODE_*`, `DISPLAY_MODES`, `PANEL_HEIGHT_THRESHOLD_PX`, `PANEL_PADDING_PX`, `MIN_PANEL_LINES`), `resolve_mode()`, `panel_inset()`, `font_for_panel()`; split `_prepare` into `_prepare` (read size → resolve mode → dispatch) + `_build_scroll_screen` + `_build_panel_screen`; cache `self._mode`; re-prepare when the reported size/mode changes; richer "display ready" log line. Keep `font_for`, `to_markup`, `PadDisplay.show` and the timer as they are. |
+| `src/dankbot/config.py` | `DEFAULT_DISPLAY_MODE = "auto"` (module-level string, not part of `Settings` — the display is CLI-only, like `--screen-name`). |
+| `src/dankbot/cli.py` | `--display-mode` on `listen` (`click.Choice(["auto", "scroll", "multiline"])`, `envvar="DANKBOT_DISPLAY_MODE"`, `show_default=True`); pass it through `_make_display` → `PadDisplay(display_mode=...)`; help text states the height rule. |
+| `src/dankbot/persona.py` | "Your words will appear on a scrolling LED display" → "Your words will appear on a small display (an LED marquee or a small LCD panel)." Keep the <100-character guidance: it is what keeps the multiline field to a few lines. |
 | `README.md` | The display section: describe both layouts, the height rule, the `DOTS` ellipsis, `--display-mode`; add the flag to the options table; stop saying the marquee is the only output. |
 | `docs/plans/ledout.md` | One "See also" line at the top pointing here; the LED-side content stays authoritative and unchanged. |
 | `tests/test_display.py` | Layout-policy unit tests + one screen-shape test per mode + the pad-swap rebuild test (see *Testing strategy*). |
@@ -312,14 +312,14 @@ def _write_quip(self, pad, runs) -> bool:
 ## CLI and config
 
 ```text
---display-mode [auto|scroll|multiline]   VOICEBOT_DISPLAY_MODE   auto
+--display-mode [auto|scroll|multiline]   DANKBOT_DISPLAY_MODE   auto
     auto       pick by panel height: <= 32 px scrolls, taller wraps
     scroll     force the one-line marquee (any height)
     multiline  force the wrapped text field (any height)
 ```
 
 Flag → env → default, like every other option. `--screen-name` still names the
-single saved screen (`F:host/s/voicebot.pb`); the mode is a property of *that
+single saved screen (`F:host/s/dank-bot.pb`); the mode is a property of *that
 panel's* build, not of the name, so swapping pads re-saves the same screen with
 the other layout.
 
@@ -334,7 +334,7 @@ green. L1–L3 need no hardware; L4 is docs, and L5 is the first real-panel chec
 | **L2** | Screen split + dispatch: `_build_scroll_screen` (moved verbatim) and `_build_panel_screen`; `_prepare` records `self._mode`; reconnect re-prepares on a size change. The LED path must stay byte-identical. | `just test` — existing scrolling assertions unchanged; new proto assertions for a 480×272 fake pad (DOTS, LEFT, inset rect, font 30); pad-swap test. |
 | **L3** | Wiring: `--display-mode` + env, `_make_display(..., display_mode)`, updated `FakeDisplay`, log line. | `just test` (CLI flag forwarding + default), `just lint`. |
 | **L4** | Docs/persona/README + the `ledout.md` cross-link. | Review; `just lint`; README quickstart reads correctly. |
-| **L5** | Hardware + simulator verification. | `TOUCHY_SIM_URL` run at 480×272 and 32×8; on the real `jc4827w543`: `voicebot listen --fake sim-overheard.txt` then a live mic run; repeat on an LED matrix. Check colour, wrapping, ellipsis, idle clear and hot-swap. |
+| **L5** | Hardware + simulator verification. | `TOUCHY_SIM_URL` run at 480×272 and 32×8; on the real `jc4827w543`: `dank-bot listen --fake sim-overheard.txt` then a live mic run; repeat on an LED matrix. Check colour, wrapping, ellipsis, idle clear and hot-swap. |
 
 **Definition of done for the stage:** with the LCD attached, a multi-colour quip
 appears as a wrapped text block; with the LED matrix attached, the same quip
@@ -371,7 +371,7 @@ the next quip.
 ## Testing strategy
 
 Everything is network-free and hardware-free by default, like the rest of
-voicebot.
+dankbot.
 
 * **`tests/test_display.py`**
   * `resolve_mode` table: `(8, auto) → scroll`, `(16, auto) → scroll`,
@@ -401,7 +401,7 @@ voicebot.
   non-zero (click `Choice`).
 * **`just lint`** — ruff format + check.
 * **Manual, on hardware (L5)** — with the real `jc4827w543`:
-  `voicebot listen --fake sim-overheard.txt` (colour + wrapping + idle clear),
+  `dank-bot listen --fake sim-overheard.txt` (colour + wrapping + idle clear),
   then a live mic run; then repeat with an LED matrix attached, including
   swapping one for the other while `listen` is running. The simulator is
   advisory (it mirrors `long_mode` only as a word-wrap toggle), so the panel is
@@ -417,18 +417,18 @@ voicebot.
 | R4 | **Vertical overflow is silently cut on a very long model reply.** | The persona + `MAX_OVERRIDE_CHARS` bound length; `DOTS` shows a cue. [`quipfit.md`](quipfit.md) steps down a font tier so the common long quip fits outright; pagination remains the follow-up for tiny panels. |
 | R5 | **A pad swap is not noticed** because the same `Touchy` handle keeps reporting the old size. | A real swap means a new USB open (or a new process); the size re-check covers the lazy-reconnect path. If a stale handle is ever seen, `_forget_pad` on any write failure already covers it. |
 | R6 | **Two pads attached** — `touchy_open()` picks the first, so the mode follows whichever it picks. | Existing limitation (`ledout.md` R5); one pad at a time is the supported setup. |
-| R7 | **The screen name is shared between modes**, so a stale `voicebot.pb` built for the other panel exists until the next `_prepare`. | `_prepare` always saves before loading, so the active screen is always freshly built for the panel in hand. |
+| R7 | **The screen name is shared between modes**, so a stale `dank-bot.pb` built for the other panel exists until the next `_prepare`. | `_prepare` always saves before loading, so the active screen is always freshly built for the panel in hand. |
 | R8 | **The sim doesn't render glyph fitting**, so tests can pass while the real LCD ellipsizes. | Sim tests assert the proto (mode, rect, alignment), hardware checks the pixels; that split is deliberate. |
 
 ## Acceptance criteria (definition of done)
 
-1. With no flags on the attached 480×272 `jc4827w543`, `voicebot listen` shows
+1. With no flags on the attached 480×272 `jc4827w543`, `dank-bot listen` shows
    the startup banner and each quip as a **left-aligned, wrapped, multi-colour
    text block**, and the idle clear blanks it.
 2. With no flags on an 8-/32-px-tall LED matrix, the same run behaves exactly as
    today: one `SCROLL_CIRCULAR` marquee at `DEFAULT_SCROLL_SPEED_PX_S`.
 3. `--display-mode scroll` forces the marquee on the LCD; `--display-mode
-   multiline` forces wrapping on the matrix; `VOICEBOT_DISPLAY_MODE` does the
+   multiline` forces wrapping on the matrix; `DANKBOT_DISPLAY_MODE` does the
    same via the environment.
 4. A quip is still **one** `text` property override; the screen is saved once per
    connection and re-saved only when the panel size/mode changes.

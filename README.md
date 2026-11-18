@@ -1,11 +1,11 @@
-# voicebot
+# dank-bot
 
 An **eavesdropping desk robot**: it listens to nearby conversation and asks a
 small LLM for a witty one-liner, then shows it on a [touchy-pad] display — a
 one-line marquee scrolling across an addressable-LED matrix, or a wrapped text
 field on an LCD.
 
-`voicebot` is the AI half of the **creep3r** art project — the pendant LED
+`dank-bot` is the AI half of the **creep3r** art project — the pendant LED
 pillar that overhears, quips, and scrolls. It runs on a Raspberry-Pi-class box,
 with a USB mic for ears and a [touchy-pad] display (an LED matrix, or any
 touchy-pad LCD) for a mouth, and it reaches out to a remote [Ollama] server for
@@ -33,7 +33,7 @@ the wit — no local GPU required.
    [ utterance gate ]          >= a few content words, de-duplicated
              |
              v
-   [ voicebot responder ]      a witty line via a remote Ollama LLM
+   [ dank-bot responder ]      a witty line via a remote Ollama LLM
              |  a one-to-two-sentence quip, or /notfunny
              v
    [ touchy-pad display ]      scrolling marquee (LED) / wrapped text (LCD)
@@ -41,9 +41,9 @@ the wit — no local GPU required.
 
 Two halves, usable independently:
 
-* **Audio in** (`voicebot listen`) — mic -> transcript -> gate -> LLM, logging
+* **Audio in** (`dank-bot listen`) — mic -> transcript -> gate -> LLM, logging
   `HEARD:` / `SKIP(...)` / `REPLY:` per utterance.
-* **LED out** (`voicebot listen`) — each quip is a *single* property write on a
+* **LED out** (`dank-bot listen`) — each quip is a *single* property write on a
   touchy-pad; an LED matrix scrolls it, a tall LCD wraps it in a text field. No
   screen re-upload.
 
@@ -52,19 +52,22 @@ Two halves, usable independently:
 Requires **Python 3.11-3.14**.
 
 ```sh
-pip install touchy-voicebot          # or:  pipx install touchy-voicebot
+pip install dank-bot          # or:  pipx install dank-bot
 ```
 
 That pulls the [`touchy-pad`](https://pypi.org/project/touchy-pad/) host library
 (**>= 0.3.12**) from PyPI for the pad output. The LLM / STT half needs no
 touchy-pad at all — with no pad attached the display is simply a logged warning.
 The display relies on a recent touchy-pad host API
-(`SetPropertiesCmd` / `build_property_override` + inline-recolour labels, plus
-`scroll_speed_px_s` for the marquee speed); if the published version is too old,
-run `just use-touchy-local`, which clones the git `main` (see [Dev](#dev)).
+(`SetPropertiesCmd` / `build_property_override` + inline-recolour labels,
+`scroll_speed_px_s` for the marquee speed, and the `text_font` override that
+steps a long quip down a font size — that last one needs **stage lb26**, the
+commit after v0.3.12); if the published version is too old, run
+`just use-touchy-local`, which clones the git `main` (see [Dev](#dev)).
+Without it the quip still shows, just at full size.
 
 You also need a reachable **Ollama** server — a local `ollama serve`, or a
-remote box over Tailscale / LAN. Point `--url` / `VOICEBOT_URL` at it. On first
+remote box over Tailscale / LAN. Point `--url` / `DANKBOT_URL` at it. On first
 use, Moonshine downloads its STT model into `~/.cache/moonshine_voice` and runs
 offline afterwards.
 
@@ -76,75 +79,75 @@ by name, so `--device` is only needed for a different input.
 
 ```sh
 # One line:
-voicebot reply --line "the bread is done baking"
+dank-bot reply --line "the bread is done baking"
 
 # A file of overheard lines (one per line):
-voicebot reply -f sim-overheard.txt
+dank-bot reply -f sim-overheard.txt
 
 # What's pulled on the server?
-voicebot models
+dank-bot models
 
 # Listen to the mic (transcribe + witty reply, logged and scrolled on the pad):
-voicebot listen
+dank-bot listen
 
 # Replay a file instead — no mic, no model (the pad still gets the quips):
-voicebot listen --fake sim-overheard.txt
+dank-bot listen --fake sim-overheard.txt
 
 # Bake off models: packaged corpus × model matrix → jokemark.md + jokemark.json
-voicebot jokemark
+dank-bot jokemark
 
 # Replay a saved bake-off: no server, no model — log + pad, 1 s per quip
-voicebot jokemark --playback jokemark.json
+dank-bot jokemark --playback jokemark.json
 ```
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `voicebot reply` | Read overheard lines (`--line` / `-f FILE` / stdin) and print a witty reply for each (`--json` for `{input, reply, skip, model, raw}` per line). Commands are stripped from the printed text, so a `/notfunny` reply prints nothing. |
-| `voicebot models` | List the models the server has pulled. |
-| `voicebot jokemark` | Bake off the quip stage: every model/params in a TOML matrix against the packaged overheard corpus (fetching missing models), writing a Markdown report and a JSON sidecar (default `jokemark.md` + `jokemark.json`). `--dry-run` shows the matrix without touching the network. If a touchy-pad is attached, each reply is also drawn on it as it is produced (entirely optional). `--playback FILE` replays a saved JSON report instead — no server, no model: entries are logged, quips shown on an attached pad, one second each. |
-| `voicebot listen` | Listen to the mic, transcribe with **Moonshine**, log `HEARD:` / `SKIP(...)` / `REPLY:` per utterance, and scroll each quip on an attached touchy-pad; `--fake FILE` replays a text file instead (no mic, no model). |
+| `dank-bot reply` | Read overheard lines (`--line` / `-f FILE` / stdin) and print a witty reply for each (`--json` for `{input, reply, skip, model, raw}` per line). Commands are stripped from the printed text, so a `/notfunny` reply prints nothing. |
+| `dank-bot models` | List the models the server has pulled. |
+| `dank-bot jokemark` | Bake off the quip stage: every model/params in a TOML matrix against the packaged overheard corpus (fetching missing models), writing a Markdown report and a JSON sidecar (default `jokemark.md` + `jokemark.json`). `--dry-run` shows the matrix without touching the network. If a touchy-pad is attached, each reply is also drawn on it as it is produced (entirely optional). `--playback FILE` replays a saved JSON report instead — no server, no model: entries are logged, quips shown on an attached pad, one second each. |
+| `dank-bot listen` | Listen to the mic, transcribe with **Moonshine**, log `HEARD:` / `SKIP(...)` / `REPLY:` per utterance, and scroll each quip on an attached touchy-pad; `--fake FILE` replays a text file instead (no mic, no model). |
 
 Configuration is **flag -> env -> default** — click implements the precedence:
 
 | Setting | Flag | Env | Default |
 |---|---|---|---|
-| Server URL | `--url` | `VOICEBOT_URL` | `https://kai.pygmy-map.ts.net` |
-| Model | `--model` | `VOICEBOT_MODEL` | Rocinante-X-12B (Q4_K_M) |
-| Persona | `--persona` / `--persona-file` | `VOICEBOT_PERSONA` | the toaster robot |
-| Temperature | `--temperature` | `VOICEBOT_TEMP` | `0.9` |
-| min-p | `--min-p` | `VOICEBOT_MIN_P` | `0.05` |
-| Context | `--ctx` | `VOICEBOT_CTX` | `4096` |
-| Max output tokens | `--max-tokens` | `VOICEBOT_MAX_TOKENS` | `120` |
-| Native `/api/chat` | `--native` | `VOICEBOT_NATIVE` | off (use `/v1`) |
+| Server URL | `--url` | `DANKBOT_URL` | `https://kai.pygmy-map.ts.net` |
+| Model | `--model` | `DANKBOT_MODEL` | Rocinante-X-12B (Q4_K_M) |
+| Persona | `--persona` / `--persona-file` | `DANKBOT_PERSONA` | the toaster robot |
+| Temperature | `--temperature` | `DANKBOT_TEMP` | `0.9` |
+| min-p | `--min-p` | `DANKBOT_MIN_P` | `0.05` |
+| Context | `--ctx` | `DANKBOT_CTX` | `4096` |
+| Max output tokens | `--max-tokens` | `DANKBOT_MAX_TOKENS` | `120` |
+| Native `/api/chat` | `--native` | `DANKBOT_NATIVE` | off (use `/v1`) |
 
 The default is what won the bake-off. Fallbacks, both already in the matrix:
 `--model hf.co/NousResearch/Hermes-3-Llama-3.1-8B-GGUF:latest` (the disciplined
 8B) or `--model hf.co/bartowski/Human-Like-Mistral-Nemo-Instruct-2407-GGUF:Q8_0`
 (the 12B runner-up).
 
-Every command also accepts `--debug` (env `VOICEBOT_DEBUG`): it lowers the
+Every command also accepts `--debug` (env `DANKBOT_DEBUG`): it lowers the
 Python logging level from `WARNING` to `DEBUG`, so the verbose detail — HTTP
 request/retry lines, display rendering, cleanup failures — is printed on stderr
 alongside the usual `HEARD:` / `SKIP(...)` / `REPLY:` lines.
 
 ## Model bake-off (jokemark)
 
-`voicebot jokemark` runs the quip stage over a corpus instead of one line at a
+`dank-bot jokemark` runs the quip stage over a corpus instead of one line at a
 time:
 
 ```sh
-just jokemark                    # or: voicebot jokemark
-voicebot jokemark --dry-run      # print the resolved matrix + line count
-voicebot jokemark --models mine.toml -o report.md --no-pull
-voicebot jokemark --playback jokemark.json   # replay a saved run (no server)
+just jokemark                    # or: dank-bot jokemark
+dank-bot jokemark --dry-run      # print the resolved matrix + line count
+dank-bot jokemark --models mine.toml -o report.md --no-pull
+dank-bot jokemark --playback jokemark.json   # replay a saved run (no server)
 ```
 
-* **Corpus:** `src/voicebot/assets/overheard.txt` — the six
+* **Corpus:** `src/dankbot/assets/overheard.txt` — the six
   `sim-overheard.txt` smoke lines plus restaurant/dinner-party conversation,
   shipped in the package and read with `importlib.resources`.
-* **Matrix:** `src/voicebot/assets/jokemark-models.toml` — model paths plus
+* **Matrix:** `src/dankbot/assets/jokemark-models.toml` — model paths plus
   optional `label`, `temperature`, `min_p`, `ctx`, `max_tokens`, `native` and
   `timeout`. TOML, so the file can carry comments about each experiment.
   `[defaults]` applies to every row; a row overrides it. Add a candidate model
@@ -154,7 +157,7 @@ voicebot jokemark --playback jokemark.json   # replay a saved run (no server)
   (`--no-pull` records them as errors instead).
 * **Pad (optional):** if a touchy-pad is attached when the run starts, every
   reply is also drawn on it as it arrives — the same parsed colour runs
-  `voicebot listen` scrolls. A missing pad is ignored (one warning, no
+  `dank-bot listen` scrolls. A missing pad is ignored (one warning, no
   per-reply probing), so the bake-off never waits for hardware;
   `--display-mode` picks the layout.
 * **Reports:** one Markdown file with a summary table (replies / skips / errors /
@@ -168,7 +171,7 @@ voicebot jokemark --playback jokemark.json   # replay a saved run (no server)
   touchy-pad, pausing one second so it can be read.
 
 The first six corpus lines are the old manual-testing file, so the bake-off
-keeps covering everything `voicebot reply -f sim-overheard.txt` used to.
+keeps covering everything `dank-bot reply -f sim-overheard.txt` used to.
 
 ## The name of the game
 
@@ -176,7 +179,7 @@ A small model asked to "tell me a joke" regurgitates memorised dad jokes. Wit
 comes from a **persona baked into the system prompt** plus a **loosened
 sampler** (`temperature=0.9`, `min_p=0.05`). The persona also defines a tiny
 **command channel**: a recognised command in the model's output is a directive
-voicebot consumes — and never displays (an unknown slash token is recovered as
+dank-bot consumes — and never displays (an unknown slash token is recovered as
 text).
 
 * `/notfunny` — "nothing worth saying": the reply is *suppressed* rather than
@@ -190,10 +193,10 @@ Markdown emphasis becomes colour too, since the panel has no bold or italic:
 cycling red → purple → blue → green → pink (an explicit `/color` still wins, and
 any leftover `*` is dropped).
 
-All of that lives in [`src/voicebot/persona.py`](src/voicebot/persona.py) and
-[`src/voicebot/commands.py`](src/voicebot/commands.py).
+All of that lives in [`src/dankbot/persona.py`](src/dankbot/persona.py) and
+[`src/dankbot/commands.py`](src/dankbot/commands.py).
 
-## Listening (`voicebot listen`)
+## Listening (`dank-bot listen`)
 
 The audio-in half: open the mic, transcribe speech with **Moonshine Voice**
 (streaming, CPU-only — the Raspberry Pi target), keep only utterances with at
@@ -204,29 +207,29 @@ least a few content words, and ask the LLM for a quip, logging `HEARD:` /
 Those log lines go to **stderr** and are rendered with
 [`rich`](https://rich.readthedocs.io): `HEARD:` / `SKIP(...)` / `REPLY:` each get
 their own colour, and the `REPLY:` line prints the quip **in the same colours the
-display scrolls** for it (see [`src/voicebot/logs.py`](src/voicebot/logs.py)) — so
+display scrolls** for it (see [`src/dankbot/logs.py`](src/dankbot/logs.py)) — so
 a colour reply is visible without the pad. A pipe or `NO_COLOR` falls back to
 plain text, and the message text itself is unchanged.
 
 | Setting | Flag | Env | Default |
 |---|---|---|---|
-| Capture device | `--device` | `VOICEBOT_MIC` | auto (name ~ `respeaker`) |
-| STT model size | `--model-arch` | `VOICEBOT_MODEL_ARCH` | `small` (tiny/base/small/medium) |
-| Min content words | `--min-words` | `VOICEBOT_MIN_WORDS` | `3` |
-| Min duration (s) | `--min-duration` | `VOICEBOT_MIN_DURATION` | `0.6` |
-| Repeat debounce (s) | `--debounce` | `VOICEBOT_DEBOUNCE` | `5.0` |
+| Capture device | `--device` | `DANKBOT_MIC` | auto (name ~ `respeaker`) |
+| STT model size | `--model-arch` | `DANKBOT_MODEL_ARCH` | `small` (tiny/base/small/medium) |
+| Min content words | `--min-words` | `DANKBOT_MIN_WORDS` | `3` |
+| Min duration (s) | `--min-duration` | `DANKBOT_MIN_DURATION` | `0.6` |
+| Repeat debounce (s) | `--debounce` | `DANKBOT_DEBOUNCE` | `5.0` |
 | Replay instead of the mic | `--fake FILE` | — | off |
 | JSON events | `--json` | — | off |
-| On-device screen name | `--screen-name` | — | `voicebot` |
-| Panel layout | `--display-mode` | `VOICEBOT_DISPLAY_MODE` | `auto` (height rule) |
-| Blank after quiet (s) | `--clear-after` | `VOICEBOT_CLEAR_AFTER` | `120` (`0` = never) |
+| On-device screen name | `--screen-name` | — | `dank-bot` |
+| Panel layout | `--display-mode` | `DANKBOT_DISPLAY_MODE` | `auto` (height rule) |
+| Blank after quiet (s) | `--clear-after` | `DANKBOT_CLEAR_AFTER` | `120` (`0` = never) |
 
 All the LLM flags (`--url` / `--model` / `--persona` / ...) are shared with
 `reply`.
 
 ## The display (on the touchy-pad)
 
-The display half: voicebot builds **one** label screen on a touchy-pad, then each
+The display half: dank-bot builds **one** label screen on a touchy-pad, then each
 quip is a single property write (no screen re-upload). The layout comes from the
 panel's reported height:
 
@@ -238,13 +241,13 @@ panel's reported height:
   (`LONG_MODE_DOTS`). A typical <100-character quip fits with room to spare. See
   [docs/plans/lcdout.md](docs/plans/lcdout.md).
 
-`--display-mode` (`VOICEBOT_DISPLAY_MODE`) overrides the rule with `scroll` or
+`--display-mode` (`DANKBOT_DISPLAY_MODE`) overrides the rule with `scroll` or
 `multiline`; the default `auto` uses the height. `/color/NAME` runs (and the
 colour runs the parser makes from `*emphasis*`) are rendered in colour via LVGL
 inline recolour on **both** layouts — e.g. `/color/red Danger ahead` shows
 "Danger ahead" in red.
 
-* The panel shows **"I'm voicebot"** on connect, then the quips; after
+* The panel shows **"I'm dank-bot"** on connect, then the quips; after
   `--clear-after` seconds with nothing new it goes blank.
 * On an LED matrix the marquee scrolls at **30 px/s** —
   `DEFAULT_SCROLL_SPEED_PX_S` (slower than LVGL's own 40 px/s default) — via
@@ -263,12 +266,12 @@ inline recolour on **both** layouts — e.g. `/color/red Danger ahead` shows
   this (it scrolls forever). See
   [docs/plans/quipfit.md](docs/plans/quipfit.md).
 * A **fresh LED board is headless** (`0x0`) until its panel chain is
-  provisioned: `touchy pref from-template led-32x8`. voicebot says so if it sees
+  provisioned: `touchy pref from-template led-32x8`. dank-bot says so if it sees
   `0x0`.
-* The screen is saved as `F:host/s/voicebot.pb` (`--screen-name` to change it) —
+* The screen is saved as `F:host/s/dank-bot.pb` (`--screen-name` to change it) —
   deliberately *not* `default`, so `touchy init` can't clobber it.
 * A quip is capped by the firmware's `SetPropertyCmd` string buffer — a 512-byte
-  nanopb field, i.e. **511 characters** (the terminator is counted); voicebot
+  nanopb field, i.e. **511 characters** (the terminator is counted); dank-bot
   truncates a longer reply to fit, so a chatty model can't overflow it. Use
   `--max-tokens` to keep replies short if you prefer.
 
@@ -277,7 +280,7 @@ inline recolour on **both** layouts — e.g. `/color/red Danger ahead` shows
 ```sh
 just install              # venv + deps
 just test                 # pytest (network-free)
-VOICEBOT_LIVE=1 just test # + one real request to the server / the mic
+DANKBOT_LIVE=1 just test # + one real request to the server / the mic
 just lint                 # ruff format + check
 just build                # wheel + sdist into dist/
 just bump-version         # bump version, commit, tag, push (then release on GitHub)
@@ -292,8 +295,8 @@ PyPI package**; `just use-touchy-local` clones (or fast-forwards)
 hacking on touchy-pad itself (`just use-touchy-pypi` puts the published package
 back).
 
-Only [`src/voicebot/display.py`](src/voicebot/display.py) imports `touchy_pad`,
-and it does so lazily, so the rest of voicebot (and the whole test suite) runs
+Only [`src/dankbot/display.py`](src/dankbot/display.py) imports `touchy_pad`,
+and it does so lazily, so the rest of dank-bot (and the whole test suite) runs
 with no touchy-pad and no hardware.
 
 ## Contributing

@@ -1,7 +1,7 @@
 """Microphone capture + speech-to-text — the "audio in" stage.
 
 This is the only module that imports ``moonshine_voice`` / ``sounddevice`` (and
-it does so lazily, so importing :mod:`voicebot` — and the test suite — never
+it does so lazily, so importing :mod:`dankbot` — and the test suite — never
 needs them). Everything else talks to the tiny :class:`TranscriptSource` seam
 below, which is what makes the loop testable with no mic, no model and no
 network.
@@ -22,12 +22,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, TextIO, runtime_checkable
 
-from .server import VoicebotError
+from .server import DankbotError
 
 log = logging.getLogger(__name__)
 
 
-class AudioError(VoicebotError):
+class AudioError(DankbotError):
     """The microphone could not be opened, or the STT engine could not start."""
 
 

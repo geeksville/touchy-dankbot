@@ -1,4 +1,4 @@
-# voicebot — dev tasks (Poetry project). See docs/plans/standalone.md.
+# dank-bot — dev tasks (Poetry project). See docs/plans/standalone.md.
 
 # List available recipes.
 default:
@@ -8,7 +8,7 @@ default:
 install:
     poetry install --no-interaction
 
-# Run the pytest suite (network-free; VOICEBOT_LIVE=1 enables the live smoke).
+# Run the pytest suite (network-free; DANKBOT_LIVE=1 enables the live smoke).
 test: install
     poetry run pytest -q
 
@@ -25,12 +25,12 @@ build:
 # Examples: `just reply -- --line "the bread is done baking"`
 #           `just reply -- -f sim-overheard.txt`
 reply *args: install
-    poetry run voicebot reply {{args}}
+    poetry run dank-bot reply {{args}}
 
 # Listen to the mic, transcribe, and scroll a witty reply per utterance on the pad.
 # `--fake FILE` replays a text file instead (no mic, no model).
 listen *args: install
-    poetry run voicebot listen {{args}}
+    poetry run dank-bot listen {{args}}
 
 # --- touchy-pad dependency ---------------------------------------------------
 # The default dependency is the *published* touchy-pad package (see
@@ -65,7 +65,7 @@ use-touchy-local:
     # An editable install from a clone needs the protoc-generated bindings
     # (app/src/touchy_pad/_proto/*_pb2.py), which upstream gitignores and only
     # generates for releases. Build them with upstream's own recipe, feeding it a
-    # throwaway venv that has grpcio-tools (so voicebot's dependencies stay lean).
+    # throwaway venv that has grpcio-tools (so dank-bot's dependencies stay lean).
     if [ ! -x "$proto_py" ]; then
         python3 -m venv reference/.proto-venv
     fi
@@ -88,7 +88,7 @@ use-touchy-pypi:
 
 # List the models the remote server has pulled.
 models *args: install
-    poetry run voicebot models {{args}}
+    poetry run dank-bot models {{args}}
 
 # Bake off the quip stage: every model/params in the packaged matrix against the
 # packaged overheard corpus, writing a Markdown report plus a JSON sidecar
@@ -97,13 +97,13 @@ models *args: install
 #           `just jokemark -- --models mine.toml -o report.md`;
 #           `just jokemark -- --playback jokemark.json` (no server; pad optional)
 jokemark *args: install
-    poetry run voicebot jokemark {{args}}
+    poetry run dank-bot jokemark {{args}}
 
 # --- release -----------------------------------------------------------------
 
 # Bump the version, commit, tag it "vX.Y.Z", and push both the commit and the
 # tag to origin. Bumps the patch component of the semver in pyproject.toml and
-# in src/voicebot/__init__.py, or use the given version (e.g. `just bump-version
+# in src/dankbot/__init__.py, or use the given version (e.g. `just bump-version
 # 0.2.0`). Requires a clean git index on the branch being pushed.
 bump-version VERSION="":
     #!/usr/bin/env bash
@@ -122,9 +122,9 @@ bump-version VERSION="":
     # pyproject.toml (the [tool.poetry] version line only — not dependency specs)
     sed -i "s/^version = \"[0-9][0-9.]*\"/version = \"${new_ver}\"/" pyproject.toml
     # ... and the runtime __version__ (the CLI's --version reads this).
-    sed -i "s/^__version__ = \"[0-9][0-9.]*\"/__version__ = \"${new_ver}\"/" src/voicebot/__init__.py
+    sed -i "s/^__version__ = \"[0-9][0-9.]*\"/__version__ = \"${new_ver}\"/" src/dankbot/__init__.py
     echo "Bumped: $ver → $new_ver"
-    git add pyproject.toml src/voicebot/__init__.py
+    git add pyproject.toml src/dankbot/__init__.py
     git commit -m "chore: bump version to v${new_ver}"
     git tag "v${new_ver}"
     git push

@@ -1,13 +1,15 @@
-# voicebot — Poetry project.
+# dank-bot — Poetry project.
 #
-# The distribution (PyPI) name is `touchy-voicebot`; the import package and the
-# console script are both `voicebot`. The `touchy-pad` host library comes from
+# The distribution (PyPI) name and the console script are `dank-bot`; the import
+# package is `dankbot` (a hyphen cannot appear in a Python identifier, and
+# `dankbot` reads better in code than dissertation-length names).
+# The `touchy-pad` host library comes from
 # PyPI, not a local path checkout — `just use-touchy-local` clones upstream into
 # reference/touchy-pad and swaps in that checkout's app/ tree while hacking on
 # the host library itself. See docs/plans/standalone.md.
 
 [tool.poetry]
-name = "touchy-voicebot"
+name = "dank-bot"
 version = "0.1.0"
 description = "An eavesdropping desk robot: witty one-liners about overheard conversation, via a remote LLM."
 authors = ["Touchy-Pad contributors"]
@@ -25,11 +27,11 @@ classifiers = [
     "Topic :: Multimedia :: Sound/Audio :: Speech",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-packages = [{ include = "voicebot", from = "src" }]
+packages = [{ include = "dankbot", from = "src" }]
 # The jokemark corpus + model matrix are data files inside the package, read via
 # importlib.resources. Name them explicitly so both the wheel and the sdist carry
 # them regardless of Poetry's package-data defaults.
-include = [{ path = "src/voicebot/assets", format = ["sdist", "wheel"] }]
+include = [{ path = "src/dankbot/assets", format = ["sdist", "wheel"] }]
 
 [tool.poetry.dependencies]
 # Match the touchy-pad host stack's supported range.
@@ -40,7 +42,7 @@ openai = ">=1.40"
 click = ">=8.1"
 # Only for the native Ollama /api/chat fallback (exact sampler control).
 requests = ">=2.31"
-# Speech-to-text for `voicebot listen` — Moonshine Voice streaming models,
+# Speech-to-text for `dank-bot listen` — Moonshine Voice streaming models,
 # CPU-friendly for the Raspberry Pi target. It bundles its own native library
 # (no onnxruntime dependency) and ships prebuilt x86_64 + arm64 wheels.
 moonshine-voice = "^0.1.5"
@@ -48,14 +50,14 @@ moonshine-voice = "^0.1.5"
 # pinning it here makes the audio layer explicit.
 sounddevice = "^0.5.6"
 # Terminal logging that mirrors the pad: `HEARD` / `SKIP` / `REPLY` in colour,
-# with the quip printed in its display colours (src/voicebot/logs.py). It
+# with the quip printed in its display colours (src/dankbot/logs.py). It
 # already arrives transitively via touchy-pad; naming it makes the direct
 # import honest. `>=13.7` is the first line that carries everything logs.py
 # uses (RichHandler + truecolor `#rrggbb` Text styles).
 rich = ">=13.7"
-# The touchy-pad host library + screen DSL, driven by `voicebot listen`
-# (src/voicebot/display.py). Pulled from PyPI; the floor is the first
-# release that carries the host API voicebot uses (`SetPropertiesCmd` /
+# The touchy-pad host library + screen DSL, driven by `dank-bot listen`
+# (src/dankbot/display.py). Pulled from PyPI; the floor is the first
+# release that carries the host API dank-bot uses (`SetPropertiesCmd` /
 # `build_property_override` + `Label.recolor` from 0.3.5, and
 # `Label.scroll_speed_px_s` from 0.3.8, which sets the marquee speed) — anything
 # older breaks the display. The long-quip font step-down additionally needs
@@ -66,22 +68,22 @@ rich = ">=13.7"
 touchy-pad = {path = "reference/touchy-pad/app", develop = true}
 
 [tool.poetry.urls]
-Homepage = "https://github.com/geeksville/voicebot"
-Repository = "https://github.com/geeksville/voicebot"
-Issues = "https://github.com/geeksville/voicebot/issues"
-Changelog = "https://github.com/geeksville/voicebot/releases"
+Homepage = "https://github.com/geeksville/dank-bot"
+Repository = "https://github.com/geeksville/dank-bot"
+Issues = "https://github.com/geeksville/dankbot/issues"
+Changelog = "https://github.com/geeksville/dankbot/releases"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8"
 ruff = ">=0.8"
 
 [tool.poetry.scripts]
-voicebot = "voicebot.cli:main"
+dank-bot = "dankbot.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
-    "live: hits the real remote LLM server (skipped unless VOICEBOT_LIVE=1)",
+    "live: hits the real remote LLM server (skipped unless DANKBOT_LIVE=1)",
 ]
 
 [tool.ruff]

@@ -1,11 +1,11 @@
-# voicebot — extracting to a standalone repo
+# dank-bot — extracting to a standalone repo
 
 ## Goal
 
-Make `voicebot` a self-contained project that no longer needs the touchy-pad
+Make `dank-bot` a self-contained project that no longer needs the touchy-pad
 source tree: depend on the *published* `touchy-pad` package, ship a trimmed
 devcontainer, add CI + PyPI release workflows, and be movable out of
-`touchy-pad/tools/voicebot` with no code changes.
+`touchy-pad/tools/dank-bot` with no code changes.
 
 ## Deliverables (this pass)
 
@@ -16,8 +16,9 @@ devcontainer, add CI + PyPI release workflows, and be movable out of
 - **`.github/workflows/`** — `ci.yml` (ruff + pytest + build, on
   ubuntu/macos/windows), `release.yml` (test → OIDC PyPI publish on a GitHub
   Release), `testpypi.yml` (manual dry run).
-- **`pyproject.toml`** — distribution name **`touchy-voicebot`**;
-  `touchy-pad = ">=0.3.8"` from PyPI; PyPI metadata (keywords/classifiers/urls).
+- **`pyproject.toml`** — distribution name **`dank-bot`**;
+  `touchy-pad` from PyPI (floor: the release carrying stage lb26, see below);
+  PyPI metadata (keywords/classifiers/urls).
 - **`justfile`** — `build`, `bump-version`, and `use-touchy-local` /
   `use-touchy-pypi` recipes for switching the dependency.
 - **`README.md`**, **`AGENTS.md`** (+ `CLAUDE.md` symlink), **`.clinerules/`**.
@@ -26,18 +27,20 @@ devcontainer, add CI + PyPI release workflows, and be movable out of
 
 | Decision | Choice | Why |
 |---|---|---|
-| PyPI name | `touchy-voicebot` | The bare name `voicebot` is already taken on PyPI (someone else's 0.0.1). |
-| Import package / console script | `voicebot` (unchanged) | Only the *distribution* name changes; keeps the code diff tiny. |
+| PyPI name | `dank-bot` | Renamed from `voicebot` on 2026-11-18; the distribution had been `touchy-voicebot`. |
+| Import package / console script | `dankbot` / `dank-bot` | A hyphen cannot appear in a Python identifier, so the module drops it (`src/dankbot`); the command keeps the project's spelling. Env vars follow the module: `DANKBOT_*`. |
 | `touchy-pad` dependency | PyPI `>=0.3.8` (default) | The floor is the first release with the host API the display uses (`SetPropertiesCmd` / `build_property_override` + `Label.recolor` from 0.3.5, `Label.scroll_speed_px_s` — the marquee speed — from 0.3.8). `just use-touchy-local` (a path dep on a clone of upstream `main` in the git-ignored `reference/touchy-pad/app`) stays the dev path for host-library work. |
 | CI OS matrix | ubuntu + macos + windows | `moonshine-voice` ships wheels for linux x86_64/arm64, macos arm64, win_amd64; the tests import no native libs, so all three install + run. |
-| Devcontainer | strip to Python + audio + USB | voicebot devs do not build firmware or run the sim GUI. |
+| Devcontainer | strip to Python + audio + USB | dank-bot devs do not build firmware or run the sim GUI. |
 
 ## Notes / open questions
 
-- **Touchy-pad floor**: `pyproject.toml` requires `touchy-pad >= 0.3.8` (settled
-  — 0.3.5 shipped the host API the display uses, 0.3.8 added
-  `Label.scroll_speed_px_s`) and `poetry.lock` is committed, so a fresh
-  `poetry install` / CI resolve just works. `just use-touchy-local` re-locks
+- **Touchy-pad floor**: the display needs `SetPropertiesCmd` /
+  `build_property_override` (0.3.5), `Label.scroll_speed_px_s` (0.3.8) and, for
+  the long-quip font step-down, **stage lb26** (`SetPropertyCmd.font_size_value`,
+  the commit after v0.3.12). `poetry.lock` is committed, so a fresh
+  `poetry install` / CI resolve just works; the PyPI floor must move to the
+  first release that carries lb26. `just use-touchy-local` re-locks
   against a clone of upstream `main` (cloned/fast-forwarded into the git-ignored
   `reference/touchy-pad`) for host-library work;
   `just use-touchy-pypi` puts the published package back.
@@ -46,11 +49,11 @@ devcontainer, add CI + PyPI release workflows, and be movable out of
   bindings upstream keeps out of git (its `build-proto-py` recipe, fed a scratch
   venv that has `grpcio-tools`), then `poetry add --editable
   reference/touchy-pad/app` and reinstalls.
-- **Trusted publishing**: create the `touchy-voicebot` project on PyPI with a
+- **Trusted publishing**: create the `dank-bot` project on PyPI with a
   trusted publisher (workflow `release.yml`, environment `pypi`), plus a
   `testpypi` environment for the dry run. Until that exists the release workflow
   will fail at the publish step.
 - **Version sync**: the version lives in `pyproject.toml` *and*
-  `src/voicebot/__init__.py`; `just bump-version` keeps both in step.
+  `src/dankbot/__init__.py`; `just bump-version` keeps both in step.
 - Once extracted, the `docs/plans/initial.md` "extraction" risk item is
-  resolved and the repo can drop its `tools/voicebot` framing.
+  resolved and the repo can drop its `tools/dank-bot` framing.

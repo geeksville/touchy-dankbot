@@ -4,14 +4,14 @@ Runs every model/parameter set in a TOML matrix against every line of the
 packaged overheard corpus, pulls whatever the server is missing, and renders one
 Markdown report with a row per line per model.
 
-Deliberately transport-free in the same way as :mod:`voicebot.responder`: the
+Deliberately transport-free in the same way as :mod:`dankbot.responder`: the
 benchmark takes a ``client_factory`` (``ModelSpec -> ChatClient``) so tests use a
-fake and never pull or chat. Only :mod:`voicebot.cli` wires in the real client.
+fake and never pull or chat. Only :mod:`dankbot.cli` wires in the real client.
 
 A run may also be handed a **display sink** (the CLI passes ``PadDisplay.show``
 when a touchy-pad happens to be attached): every reply that is not a
 ``/notfunny`` skip is then drawn as it arrives, using the same parsed colour
-runs ``voicebot listen`` shows. The device is entirely optional — no sink means
+runs ``dank-bot listen`` shows. The device is entirely optional — no sink means
 "report only", and a sink that fails must never cost the bake-off its run.
 
 Every run is written twice: a Markdown report for a human
@@ -20,7 +20,7 @@ untruncated (:func:`render_json`). That JSON is also the input to
 :func:`playback` — replays a recorded run to the log and to an optional pad, a
 second per quip so it can be read, without asking any model anything.
 
-The corpus and the matrix live in ``voicebot/assets/`` and are read through
+The corpus and the matrix live in ``dankbot/assets/`` and are read through
 :mod:`importlib.resources`, so an installed wheel behaves exactly like a source
 checkout. The matrix is TOML (stdlib :mod:`tomllib`, no dependency) rather than
 JSON so it can carry comments explaining each experiment. See
@@ -51,7 +51,7 @@ from .config import (
 )
 from .display import DisplaySink
 from .responder import Reply, Responder
-from .server import VoicebotError
+from .server import DankbotError
 
 log = logging.getLogger(__name__)
 
@@ -143,7 +143,7 @@ class ChatBackend(Protocol):
 
 def packaged_text(name: str) -> str:
     """Read an asset (matrix or corpus) from the installed package."""
-    return (resources.files("voicebot") / ASSETS / name).read_text(encoding="utf-8")
+    return (resources.files("dankbot") / ASSETS / name).read_text(encoding="utf-8")
 
 
 def load_lines(text: str, *, limit: int | None = None) -> tuple[str, ...]:
@@ -295,13 +295,13 @@ def run_benchmark(
     """Run every spec against every line, one model at a time.
 
     A missing model is pulled first (unless *pull* is false, in which case the
-    bank is recorded as an error). The first :class:`VoicebotError` inside a bank
+    bank is recorded as an error). The first :class:`DankbotError` inside a bank
     aborts that bank only — a down server should not cost the remaining models
     their turn. *on_result* is called as each bank completes, so the CLI can
     still render a partial report after Ctrl-C.
 
     *display*, when given, receives each non-skip reply's colour runs as the
-    reply arrives (the same ``Reply.runs`` ``voicebot listen`` shows); it is
+    reply arrives (the same ``Reply.runs`` ``dank-bot listen`` shows); it is
     optional and a failing sink is logged, never fatal.
     """
     results: list[ModelResult] = []
@@ -319,7 +319,7 @@ def run_benchmark(
                     log.info("pulling %s (this can take a while)", spec.model)
                     client.pull_model(spec.model)
                     pulled = True
-        except VoicebotError as exc:
+        except DankbotError as exc:
             error = str(exc)
             log.warning("%s: %s", spec.label, error)
 
@@ -329,7 +329,7 @@ def run_benchmark(
                 started = time.monotonic()
                 try:
                     reply = responder.respond(line)
-                except VoicebotError as exc:
+                except DankbotError as exc:
                     failed_after = time.monotonic() - started
                     error = str(exc)
                     line_results.append(

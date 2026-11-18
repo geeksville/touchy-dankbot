@@ -40,13 +40,13 @@ jobs:
       - name: Upload dist artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: voicebot-dist
+          name: dank-bot-dist
           path: dist/
 
   # ---------------------------------------------------------------------------
   # publish-pypi: OIDC trusted publish — only runs after tests pass.
   # Configure the "pypi" environment + a trusted publisher for the
-  # `touchy-voicebot` project on PyPI (workflow: release.yml).
+  # `dank-bot` project on PyPI (workflow: release.yml).
   # ---------------------------------------------------------------------------
   publish-pypi:
     name: Publish to PyPI
@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/touchy-voicebot
+      url: https://pypi.org/p/dank-bot
     permissions:
       id-token: write
       attestations: write
@@ -62,7 +62,7 @@ jobs:
       - name: Download dist artifacts
         uses: actions/download-artifact@v7
         with:
-          name: voicebot-dist
+          name: dank-bot-dist
           path: dist/
 
       - name: Generate artifact attestation

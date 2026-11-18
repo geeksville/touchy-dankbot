@@ -1,4 +1,4 @@
-# jokemark model matrix — the plan for `voicebot jokemark`.
+# jokemark model matrix — the plan for `dank-bot jokemark`.
 #
 # Every `[[models]]` entry is one *bank* of runs: a model plus the sampler it is
 # chatted with, run against every line of the packaged overheard corpus. TOML
@@ -15,7 +15,7 @@
 #   timeout      per-request chat timeout in seconds                  (CLI flag)
 #
 # `[defaults]` (same knobs, minus model/label) applies to every entry; an entry
-# overrides it. Anything still unset falls back to voicebot.config's DEFAULT_*.
+# overrides it. Anything still unset falls back to dankbot.config's DEFAULT_*.
 #
 # To retire a candidate, comment out its `# [[models]]` block and leave the
 # verdict beside it ("# disabled: very unfunny") — the record of having tried it

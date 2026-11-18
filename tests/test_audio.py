@@ -8,7 +8,7 @@ import types
 
 import pytest
 
-from voicebot.audio import (
+from dankbot.audio import (
     _MOONSHINE_ARCHES,
     AudioError,
     AudioIn,
@@ -93,7 +93,7 @@ def test_on_error_is_logged_as_a_warning(caplog):
     import logging
 
     audio_in = AudioIn(model_arch="small")
-    with caplog.at_level(logging.WARNING, logger="voicebot.audio"):
+    with caplog.at_level(logging.WARNING, logger="dankbot.audio"):
         audio_in._on_error(RuntimeError("boom"))
     assert "speech-to-text error: boom" in caplog.text
 

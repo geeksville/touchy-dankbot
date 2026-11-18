@@ -8,7 +8,7 @@ app inherits the prototype's behaviour.
 The mechanism also defines the **control channel**: a recognised command in the
 model's output — ``/notfunny`` (nothing worth saying) or ``/color/NAME``
 (coloured text) — is consumed and never displayed; an unknown slash token is
-recovered as text. See :mod:`voicebot.commands` and ``docs/plans/ledout.md``.
+recovered as text. See :mod:`dankbot.commands` and ``docs/plans/ledout.md``.
 """
 
 from __future__ import annotations

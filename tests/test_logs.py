@@ -9,11 +9,11 @@ import pytest
 from rich.console import Console
 from rich.logging import RichHandler
 
-from voicebot import logs
-from voicebot.commands import COLOURS, WHITE, Run
-from voicebot.listen import KIND_REPLY, ListenEvent, log_emitter
+from dankbot import logs
+from dankbot.commands import COLOURS, WHITE, Run
+from dankbot.listen import KIND_REPLY, ListenEvent, log_emitter
 
-TEST_LOGGER = "voicebot.test_logs"
+TEST_LOGGER = "dankbot.test_logs"
 
 
 @pytest.fixture
@@ -96,7 +96,7 @@ def test_the_listen_emitter_logs_the_quip_as_colour_runs(caplog):
         model="m",
         runs=(Run("Danger", COLOURS["red"]), Run(" ahead", WHITE)),
     )
-    with caplog.at_level(logging.INFO, logger="voicebot.listen"):
+    with caplog.at_level(logging.INFO, logger="dankbot.listen"):
         log_emitter(event)
     record = caplog.records[-1]
     assert record.getMessage() == "REPLY: Danger ahead"
@@ -126,46 +126,46 @@ def test_configure_installs_one_handler(monkeypatch):
         root.setLevel(saved_level)
 
 
-def test_enable_debug_lowers_the_root_and_voicebot_loggers():
+def test_enable_debug_lowers_the_root_and_dankbot_loggers():
     root = logging.getLogger()
-    voicebot = logging.getLogger("voicebot")
-    saved_levels = root.level, voicebot.level
+    dankbot = logging.getLogger("dankbot")
+    saved_levels = root.level, dankbot.level
     try:
         logs.enable_debug()
         assert root.level == logging.DEBUG
-        assert voicebot.getEffectiveLevel() == logging.DEBUG
+        assert dankbot.getEffectiveLevel() == logging.DEBUG
     finally:
         root.setLevel(saved_levels[0])
-        voicebot.setLevel(saved_levels[1])
+        dankbot.setLevel(saved_levels[1])
 
 
 def test_enable_debug_lets_debug_records_through(caplog):
     root = logging.getLogger()
-    voicebot = logging.getLogger("voicebot")
-    saved_levels = root.level, voicebot.level
+    dankbot = logging.getLogger("dankbot")
+    saved_levels = root.level, dankbot.level
     try:
         logs.enable_debug()
-        voicebot.debug("deep detail")
+        dankbot.debug("deep detail")
     finally:
         root.setLevel(saved_levels[0])
-        voicebot.setLevel(saved_levels[1])
+        dankbot.setLevel(saved_levels[1])
     assert caplog.records[-1].levelno == logging.DEBUG
     assert "deep detail" in caplog.text
 
 
 def test_ensure_verbosity_lifts_info_but_never_hides_debug():
     root = logging.getLogger()
-    voicebot = logging.getLogger("voicebot")
-    saved_levels = root.level, voicebot.level
+    dankbot = logging.getLogger("dankbot")
+    saved_levels = root.level, dankbot.level
     try:
         root.setLevel(logging.WARNING)
-        voicebot.setLevel(logging.NOTSET)
+        dankbot.setLevel(logging.NOTSET)
         logs.ensure_verbosity(logging.INFO)  # listen / jokemark without --debug
-        assert voicebot.getEffectiveLevel() == logging.INFO
+        assert dankbot.getEffectiveLevel() == logging.INFO
 
         logs.enable_debug()
         logs.ensure_verbosity(logging.INFO)  # ... and the same after --debug
-        assert voicebot.getEffectiveLevel() == logging.DEBUG
+        assert dankbot.getEffectiveLevel() == logging.DEBUG
     finally:
         root.setLevel(saved_levels[0])
-        voicebot.setLevel(saved_levels[1])
+        dankbot.setLevel(saved_levels[1])

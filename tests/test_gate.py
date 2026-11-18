@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from voicebot.gate import UtteranceGate, content_words
+from dankbot.gate import UtteranceGate, content_words
 
 
 def test_content_words_strips_filler_and_punctuation():
