@@ -60,7 +60,7 @@ rich = ">=13.7"
 # `Label.scroll_speed_px_s` from 0.3.8, which sets the marquee speed) — anything
 # older breaks the display. `just use-touchy-local` swaps in a path dep
 # against the sibling ../../app checkout for host-library development.
-touchy-pad = ">=0.3.10"
+touchy-pad = ">=0.3.12"
 
 [tool.poetry.urls]
 Homepage = "https://github.com/geeksville/voicebot"

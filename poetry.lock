@@ -492,14 +492,14 @@ hsm = ["python-pkcs11"]
 
 [[package]]
 name = "filelock"
-version = "4.2.11"
+version = "4.2.12"
 description = "A platform independent file lock."
 optional = false
 python-versions = ">=3.11"
 groups = ["main"]
 files = [
-    {file = "filelock-4.2.11-py3-none-any.whl", hash = "sha256:020e229e4bb9d410fc799c07ddf45fa217cba970278f40b30751d94f309b69e2"},
-    {file = "filelock-4.2.11.tar.gz", hash = "sha256:0cb84119fb8dce17898e1f69c974d5019daa59c4d7656be390a5fa59ccced912"},
+    {file = "filelock-4.2.12-py3-none-any.whl", hash = "sha256:21decfec02f116ed4c954433cdb31f28c3b346b784543177b6d7059da2702ee9"},
+    {file = "filelock-4.2.12.tar.gz", hash = "sha256:7e7da24d3ac39268b0f156e56870001de44886318f092f9d851e692f7114d6dd"},
 ]
 
 [[package]]
@@ -1585,14 +1585,14 @@ files = [
 
 [[package]]
 name = "touchy-pad"
-version = "0.3.10"
+version = "0.3.12"
 description = "Host library and CLI for the Touchy-Pad USB multitouch device."
 optional = false
 python-versions = "<3.15,>=3.11"
 groups = ["main"]
 files = [
-    {file = "touchy_pad-0.3.10-py3-none-any.whl", hash = "sha256:9132112415442cc2cdf492abfa83faa4b3e4ea965563b5b649dd63f4bf77308f"},
-    {file = "touchy_pad-0.3.10.tar.gz", hash = "sha256:6a3e5eda75253d7928859e0c6a01eb2bcfa8766838e3e1137853ecdd96a51e16"},
+    {file = "touchy_pad-0.3.12-py3-none-any.whl", hash = "sha256:7c99202b253954ac7aa52a9ddb9f57c2932456775344b75fe49123d81f55217f"},
+    {file = "touchy_pad-0.3.12.tar.gz", hash = "sha256:ec6fc55d84eb5ede730c6cfb5da234def052e296cc8450433cf66f8a3123970b"},
 ]
 
 [package.dependencies]
@@ -1856,4 +1856,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.15"
-content-hash = "f879571e0c5fc3944aa609ba985c6e7e7847d449b18123890a75c3a07d738670"
+content-hash = "63d98dc34513dc24fa0bcf7936ba611a66fe97cf1be824e930d01334533efd55"
