@@ -61,11 +61,11 @@ rich = ">=13.7"
 # `build_property_override` + `Label.recolor` from 0.3.5, and
 # `Label.scroll_speed_px_s` from 0.3.8, which sets the marquee speed) — anything
 # older breaks the display. The long-quip font step-down additionally needs
-# stage lb26 (`SetPropertyCmd.font_size_value`, the commit after v0.3.12), so
-# the PyPI floor must move to the first release that carries it.
+# stage lb26 (`SetPropertyCmd.font_size_value`), which shipped in 0.4.0 — that is
+# the floor.
 # `just use-touchy-local` swaps in a path dep against
 # a clone of upstream main (reference/touchy-pad/app) for host-library work.
-touchy-pad = {path = "reference/touchy-pad/app", develop = true}
+touchy-pad = ">=0.4.0"
 
 [tool.poetry.urls]
 Homepage = "https://github.com/geeksville/dank-bot"

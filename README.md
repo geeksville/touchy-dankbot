@@ -56,13 +56,13 @@ pip install dank-bot          # or:  pipx install dank-bot
 ```
 
 That pulls the [`touchy-pad`](https://pypi.org/project/touchy-pad/) host library
-(**>= 0.3.12**) from PyPI for the pad output. The LLM / STT half needs no
+(**>= 0.4.0**) from PyPI for the pad output. The LLM / STT half needs no
 touchy-pad at all — with no pad attached the display is simply a logged warning.
 The display relies on a recent touchy-pad host API
 (`SetPropertiesCmd` / `build_property_override` + inline-recolour labels,
 `scroll_speed_px_s` for the marquee speed, and the `text_font` override that
-steps a long quip down a font size — that last one needs **stage lb26**, the
-commit after v0.3.12); if the published version is too old, run
+steps a long quip down a font size — that last one needs **stage lb26**, shipped
+in 0.4.0); if the published version is too old, run
 `just use-touchy-local`, which clones the git `main` (see [Dev](#dev)).
 Without it the quip still shows, just at full size.
 

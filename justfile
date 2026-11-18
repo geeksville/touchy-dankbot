@@ -40,6 +40,10 @@ listen *args: install
 # (committed files), so the way back is
 # `git checkout pyproject.toml poetry.lock`.
 
+# The published floor `use-touchy-pypi` restores. Keep it in step with the
+# `touchy-pad = ...` line in pyproject.toml (and the lb26 note there).
+touchy_pad_floor := ">=0.4.0"
+
 # Clone or fast-forward https://github.com/geeksville/touchy-pad.git into
 # reference/touchy-pad (git-ignored), generate the protobuf bindings upstream
 # keeps out of git, then depend on that checkout's app/ host library — i.e.
@@ -78,13 +82,51 @@ use-touchy-local:
 
 # Point the touchy-pad dependency back at the published PyPI package (the default).
 # NB: the long-quip font step-down needs stage lb26 (`SetPropertyCmd.font_size_value`,
-# the commit after v0.3.12). On an older host library that entry goes out as an
+# released as touchy-pad v0.4.0). On an older host library that entry goes out as an
 # `int_value`, which the lb26 firmware refuses — the quip still shows, at full size.
 use-touchy-pypi:
     #!/usr/bin/env bash
     set -euo pipefail
-    poetry add --no-interaction "touchy-pad@>=0.3.12"
+    # Rewrite the dependency line in place instead of `poetry add`: while the entry
+    # is an editable path dep, `poetry add` has to load that local package first, so
+    # anything that goes wrong there (no `reference/` checkout in a fresh clone — it
+    # is git-ignored — or a half-finished edit) aborts *before* pyproject.toml is
+    # rewritten, leaving it pointing at the local tree. The rewrite is deterministic,
+    # keeps the comment block above the line, and `poetry lock` only re-resolves
+    # what actually changed.
+    if ! grep -q '^touchy-pad = ' pyproject.toml; then
+        echo "use-touchy-pypi: pyproject.toml has no touchy-pad dependency to rewrite" >&2
+        exit 1
+    fi
+    sed -i -E 's|^touchy-pad = .*|touchy-pad = "{{touchy_pad_floor}}"|' pyproject.toml
+    # `--no-cache` is the point of this recipe: Poetry caches PyPI's index for what
+    # is effectively forever (the cache entries carry a ~317-year max-age), so a
+    # release published minutes ago stays invisible to a cached resolve and the
+    # solver fails with "touchy-pad (>=0.4.0) ... doesn't match any versions" even
+    # though PyPI has it. Ask the index instead of the cache.
+    if ! poetry lock --no-interaction --no-cache; then
+        echo "use-touchy-pypi: cannot resolve touchy-pad {{touchy_pad_floor}} — is it on PyPI?" >&2
+        exit 1
+    fi
     poetry install --no-interaction
+    # Prove it stuck: the lock must carry the PyPI release, not a directory source.
+    poetry run python - <<'PY'
+    import pathlib
+    import sys
+    import tomllib
+    from touchy_pad.api import build_property_override
+    packages = tomllib.loads(pathlib.Path("poetry.lock").read_text())["package"]
+    touchy = next(pkg for pkg in packages if pkg["name"] == "touchy-pad")
+    if source := touchy.get("source"):
+        sys.exit(f"use-touchy-pypi: touchy-pad is still locked from a {source['type']} source")
+    print(f"touchy-pad {touchy['version']} locked from PyPI")
+    # The font step-down rides on stage lb26 (`SetPropertyCmd.font_size_value`); a
+    # release that predates it sends that entry as an int instead, which the lb26
+    # firmware refuses — the quip still shows, at full size (and the display tests
+    # that assert the smaller font fail). Say so rather than leave it a mystery.
+    if build_property_override("dankbot", "text_font", 16).WhichOneof("value") != "font_size_value":
+        print("note: this release predates stage lb26 (0.4.0) — the font step-down stays inert")
+    PY
 
 # List the models the remote server has pulled.
 models *args: install

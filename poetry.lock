@@ -1585,13 +1585,15 @@ files = [
 
 [[package]]
 name = "touchy-pad"
-version = "0.3.12"
+version = "0.4.0"
 description = "Host library and CLI for the Touchy-Pad USB multitouch device."
 optional = false
-python-versions = ">=3.11,<3.15"
+python-versions = "<3.15,>=3.11"
 groups = ["main"]
-files = []
-develop = true
+files = [
+    {file = "touchy_pad-0.4.0-py3-none-any.whl", hash = "sha256:c3df0f460e701b2054895e3d4f78e801e6a9ae8d677851f4709ea41d39afa123"},
+    {file = "touchy_pad-0.4.0.tar.gz", hash = "sha256:88d8d9ab8298e8a61c6cab9d3bb6b8fdb11da062a3f632ca7a157917a16447bd"},
+]
 
 [package.dependencies]
 click = ">=8.1"
@@ -1607,10 +1609,6 @@ streamcontroller-streamdeck = ">=0.1.5"
 
 [package.extras]
 sim = ["PySide6 (>=6.6,<7)", "platformdirs (>=4)"]
-
-[package.source]
-type = "directory"
-url = "reference/touchy-pad/app"
 
 [[package]]
 name = "tqdm"
@@ -1858,4 +1856,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.15"
-content-hash = "0f40c92ce13fd03f6d417e5953a0234f515b868818665d671c10cb966cac75d0"
+content-hash = "cffed14f8215e7428440725eb27561046b046bc045bbc1e107c448e59b8e5507"

@@ -17,7 +17,8 @@ devcontainer, add CI + PyPI release workflows, and be movable out of
   ubuntu/macos/windows), `release.yml` (test → OIDC PyPI publish on a GitHub
   Release), `testpypi.yml` (manual dry run).
 - **`pyproject.toml`** — distribution name **`dank-bot`**;
-  `touchy-pad` from PyPI (floor: the release carrying stage lb26, see below);
+  `touchy-pad` from PyPI (floor `0.4.0`, the first release carrying stage lb26 —
+  see below);
   PyPI metadata (keywords/classifiers/urls).
 - **`justfile`** — `build`, `bump-version`, and `use-touchy-local` /
   `use-touchy-pypi` recipes for switching the dependency.
@@ -29,7 +30,7 @@ devcontainer, add CI + PyPI release workflows, and be movable out of
 |---|---|---|
 | PyPI name | `dank-bot` | Renamed from `voicebot` on 2026-11-18; the distribution had been `touchy-voicebot`. |
 | Import package / console script | `dankbot` / `dank-bot` | A hyphen cannot appear in a Python identifier, so the module drops it (`src/dankbot`); the command keeps the project's spelling. Env vars follow the module: `DANKBOT_*`. |
-| `touchy-pad` dependency | PyPI `>=0.3.8` (default) | The floor is the first release with the host API the display uses (`SetPropertiesCmd` / `build_property_override` + `Label.recolor` from 0.3.5, `Label.scroll_speed_px_s` — the marquee speed — from 0.3.8). `just use-touchy-local` (a path dep on a clone of upstream `main` in the git-ignored `reference/touchy-pad/app`) stays the dev path for host-library work. |
+| `touchy-pad` dependency | PyPI `>=0.4.0` (default) | The floor is the first release with the host API the display uses (`SetPropertiesCmd` / `build_property_override` + `Label.recolor` from 0.3.5, `Label.scroll_speed_px_s` — the marquee speed — from 0.3.8, and stage lb26's `SetPropertyCmd.font_size_value` from 0.4.0). `just use-touchy-local` (a path dep on a clone of upstream `main` in the git-ignored `reference/touchy-pad/app`) stays the dev path for host-library work. |
 | CI OS matrix | ubuntu + macos + windows | `moonshine-voice` ships wheels for linux x86_64/arm64, macos arm64, win_amd64; the tests import no native libs, so all three install + run. |
 | Devcontainer | strip to Python + audio + USB | dank-bot devs do not build firmware or run the sim GUI. |
 
@@ -37,10 +38,10 @@ devcontainer, add CI + PyPI release workflows, and be movable out of
 
 - **Touchy-pad floor**: the display needs `SetPropertiesCmd` /
   `build_property_override` (0.3.5), `Label.scroll_speed_px_s` (0.3.8) and, for
-  the long-quip font step-down, **stage lb26** (`SetPropertyCmd.font_size_value`,
-  the commit after v0.3.12). `poetry.lock` is committed, so a fresh
-  `poetry install` / CI resolve just works; the PyPI floor must move to the
-  first release that carries lb26. `just use-touchy-local` re-locks
+  the long-quip font step-down, **stage lb26** (`SetPropertyCmd.font_size_value`),
+  which shipped as 0.4.0 — so the floor is `>=0.4.0`. `poetry.lock` is
+  committed, so a fresh `poetry install` / CI resolve just works.
+  `just use-touchy-local` re-locks
   against a clone of upstream `main` (cloned/fast-forwarded into the git-ignored
   `reference/touchy-pad`) for host-library work;
   `just use-touchy-pypi` puts the published package back.

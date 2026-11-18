@@ -10,7 +10,7 @@ shrinking per reply"* (and its risks R2/R4), made possible by a touchy-pad
 feature that landed while the plan was being written.
 
 > **Status: DONE (2026-11-18).** Built against touchy-pad **stage lb26**
-> (upstream `main`, the commit after v0.3.12): `SetPropertyCmd.font_size_value`
+> (upstream `main` then; released as 0.4.0): `SetPropertyCmd.font_size_value`
 > plus the `text_font` runtime override. `display.py` fits the quip and sends the
 > font in the **same** property batch as the text — no second screen, no screen
 > re-upload, no new CLI flag. `just test` **250 passed / 2 skipped**;
@@ -61,9 +61,8 @@ as a **font pointer**. touchy-pad lb26 fixed exactly that:
 **Floor.** Both sides need lb26. An older host library sends the entry as
 `int_value`, which lb26 firmware refuses (the quip still shows, at full size);
 pre-lb26 firmware would treat that int as a font pointer — which is why the
-feature exists. The PyPI floor must therefore move to the first release that
-carries lb26 (upstream is `v0.3.12` + that commit today); `AGENTS.md`,
-`pyproject.toml` and the `just use-touchy-pypi` comment say so.
+feature exists. The floor is therefore 0.4.0, the first release that carries
+lb26; `AGENTS.md`, `pyproject.toml` and the `just use-touchy-pypi` comment say so.
 
 ## Goal / vision
 
@@ -228,7 +227,7 @@ Network-free and hardware-free; the fake pad is the duck-typed one in
 | Q1 | **The capacity estimate is wrong for real glyphs** (caps, `W`/`M`, long words). | 0.62 em is ~15 % generous and the tiers are 30 → 16, so an error must be large to matter. F4 measures it; tune the two constants — no structural change. |
 | Q2 | **A sticky font outlives a restart** and a short quip inherits 16 px. | The font is sent with *every* quip (not just on change), so the first quip after a restart corrects it. The idle clear leaves the size alone (empty text fits everywhere). |
 | Q3 | **Does `text_font` resolve on a `recolor` label?** (On the device it is a span group, and label-only properties like `long_mode` do not resolve on it.) | lb26 applies the font to the widget object and documents labels, buttons *and* span groups; the sim's materialised `font_size` style is asserted in `test_a_long_quip_shrinks_the_font_on_the_lcd`. F4 confirms on glass. |
-| Q4 | **The floor moved**: a host library older than lb26 sends the entry as `int_value` (refused by new firmware, read as a pointer by old firmware). | A pre-lb26 firmware is handled: the refusal is retried without the font (`_is_refusal`), so the quip still shows at full size and the pad is not dropped. The firmware reports `0.3.12` with *or* without lb26, so a version check could not tell them apart anyway — the fallback is the guard. `AGENTS.md`, `pyproject.toml` and the `just use-touchy-pypi` comment record the requirement; `use-touchy-local` (upstream main) has it today. |
+| Q4 | **The floor moved**: a host library older than lb26 sends the entry as `int_value` (refused by new firmware, read as a pointer by old firmware). | A pre-lb26 firmware is handled: the refusal is retried without the font (`_is_refusal`), so the quip still shows at full size and the pad is not dropped. The firmware reports `0.3.12` with *or* without lb26, so a version check could not tell them apart anyway — the fallback is the guard. `AGENTS.md`, `pyproject.toml` and the `just use-touchy-pypi` comment record the requirement; 0.4.0 is the first release that carries it. |
 | Q5 | **14 px is compiled but never chosen.** | Deliberate: it is 2 px smaller than 16 (a few more characters per line) and less legible. If F4 says 16 px overflows where 14 would fit, adding `14` to `FONT_SIZES` is a one-line change — the fit code iterates the tuple. |
 | Q6 | **Tiny LCDs still overflow at 8 px.** | `font_for_text` returns the smallest tier and `DOTS` remains the visible cue; pagination is the recorded follow-up. Multiline on a postage-stamp panel is best-effort by design. |
 | Q7 | **The real fix may be shorter replies** (`--max-tokens`, a stricter persona prompt). | Complementary, not a substitute: the display must cope with the 511 characters the protocol allows. Worth a separate TODO. |

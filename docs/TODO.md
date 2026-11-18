@@ -5,6 +5,7 @@ misc
 * !use colors for empasis
 * use thought bubbles
 * !add ai usage to readme
+* overhaul the readme (local ai no creeper)
 * thank model author
 * thank voice author
 

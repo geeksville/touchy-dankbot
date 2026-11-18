@@ -65,7 +65,7 @@ libraries themselves:
 
 `touchy_pad._proto`, `touchy_pad.sim`, `touchy_pad.cli` and the generated
 `_proto/*` modules are internal. In a Poetry project pin it normally, e.g.
-`touchy-pad = ">=0.3.8"`.
+`touchy-pad = ">=0.4.0"`.
 
 ```python
 from touchy_pad.api import touchy_open, touchy_get_pad_ids

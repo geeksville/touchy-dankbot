@@ -62,14 +62,14 @@ just bump-version          # bump version, commit, tag, push
   (`SetPropertiesCmd` / `build_property_override` + `Label.recolor` arrived in
   0.3.5; 0.3.8 added `Label.scroll_speed_px_s`, the marquee-speed knob
   `display.py` uses to slow the scroll to `DEFAULT_SCROLL_SPEED_PX_S`; **lb26**,
-  the commit after v0.3.12, added `SetPropertyCmd.font_size_value` and
+  released in 0.4.0, added `SetPropertyCmd.font_size_value` and
   `FontSize` / `FONT_SIZES` — the runtime `text_font` override a long quip steps
   down through). A host library older than lb26 sends that entry as an
   `int_value`, which the lb26 firmware refuses (and pre-lb26 firmware would read
-  as a font pointer), so the PyPI floor must move to the first release that
-  carries it. Older releases break the display path and its
-  tests. To develop against upstream instead of PyPI, run
-  `just use-touchy-local`: it clones or fast-forwards
+  as a font pointer), so the floor is 0.4.0, the first release that carries it.
+  Older releases break the display path and its tests. To develop against
+  upstream instead of PyPI, run `just use-touchy-local`: it clones or
+  fast-forwards
   [geeksville/touchy-pad](https://github.com/geeksville/touchy-pad) into the
   git-ignored `reference/touchy-pad`, generates the protobuf bindings upstream
   keeps out of git (via a scratch venv with `grpcio-tools`), and path-depends on
