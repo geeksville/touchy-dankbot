@@ -21,11 +21,13 @@ from voicebot.display import (
     MODE_MULTILINE,
     MODE_SCROLL,
     STARTUP_TEXT,
+    STRIP_EMOJI,
     PadDisplay,
     font_for,
     font_for_panel,
     panel_inset,
     resolve_mode,
+    to_ascii,
     to_markup,
 )
 
@@ -109,6 +111,62 @@ def test_a_coloured_run_is_truncated_within_budget():
 
 def test_markup_takes_a_smaller_budget():
     assert len(to_markup([Run("x" * 2000)], max_chars=64)) == 64
+
+
+# --- to_ascii (the device font is ASCII-only) -------------------------------
+
+
+def test_to_ascii_keeps_plain_text():
+    assert to_ascii("Time to toast!") == "Time to toast!"
+
+
+def test_to_ascii_drops_emoji():
+    assert to_ascii("🤔 I bet 💪") == " I bet "
+
+
+def test_to_ascii_folds_typographic_punctuation():
+    assert to_ascii("don’t — “stop” …") == 'don\'t - "stop" ...'
+
+
+def test_to_ascii_decomposes_accents():
+    assert to_ascii("café naïve") == "cafe naive"
+
+
+def test_to_ascii_squeezes_the_space_a_dropped_emoji_leaves():
+    assert to_ascii("toast 🍞 crunch") == "toast crunch"
+
+
+def test_emoji_never_reach_the_device():
+    # The bread quip from the field: emoji are dropped, not drawn as boxes.
+    out = to_markup([Run("🤔 I bet the bread's been secretly training for the Iron Loaf! 💪")])
+    assert out == "I bet the bread's been secretly training for the Iron Loaf!"
+
+
+def test_emoji_in_a_coloured_run_are_dropped_too():
+    assert to_markup([Run("🤔 Danger! 💪", COLOURS["red"])]) == "#FF0000 Danger!#"
+
+
+def test_an_emoji_only_quip_sends_nothing():
+    assert to_markup([Run("🤔💪")]) == ""
+
+
+def test_dropped_emoji_do_not_eat_into_the_device_budget():
+    # 20 emoji would halve the usable length if they were counted.
+    assert to_markup([Run("🧇" * 20 + "x" * 600)], max_chars=64) == "x" * 64
+
+
+# --- the STRIP_EMOJI switch --------------------------------------------------
+
+
+def test_emoji_are_stripped_by_default():
+    assert STRIP_EMOJI is True
+
+
+def test_the_emoji_fold_can_be_switched_off(monkeypatch):
+    # Once the device font has emoji glyphs, flipping STRIP_EMOJI keeps them.
+    monkeypatch.setattr("voicebot.display.STRIP_EMOJI", False)
+    assert to_markup([Run("🤔 I bet 💪")]) == "🤔 I bet 💪"
+    assert to_markup([Run("🤔 Danger! 💪", COLOURS["red"])]) == "#FF0000 🤔 Danger! 💪#"
 
 
 # --- font_for --------------------------------------------------------------

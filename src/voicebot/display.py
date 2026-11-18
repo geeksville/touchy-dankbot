@@ -19,11 +19,18 @@ unit-tested without the host library installed.
 A pad is opened **lazily**, only when there is something to show, so a pad
 plugged in later is picked up on the next message and a missing one is never
 fatal. An idle timer blanks the display after ``clear_after`` seconds of quiet.
+
+The panel's font is ASCII-only, so every quip is folded to ASCII on the way out
+(:func:`to_ascii`, gated by :data:`STRIP_EMOJI` — on for now): emoji are dropped
+rather than drawn as missing-glyph boxes. Flip that flag once the device font
+grows emoji glyphs.
 """
 
 from __future__ import annotations
 
 import logging
+import re
+import unicodedata
 from collections.abc import Callable, Sequence
 from threading import Lock, Timer
 from typing import Any
@@ -145,6 +152,47 @@ def font_for_panel(height: int) -> int:
     return max(fits) if fits else FONT_SIZES[0]
 
 
+#: Fold every quip to ASCII before it goes to the device (:func:`to_ascii`).
+#: **On** because the panel's font is ASCII-only today, so an emoji draws as a
+#: missing-glyph box. Set this to ``False`` once the device font has emoji
+#: glyphs — nothing else needs to change.
+STRIP_EMOJI = True
+
+#: Typographic punctuation a small model reaches for, mapped to the ASCII the
+#: panel font actually draws. Emoji have no sensible equivalent and are dropped.
+_PUNCTUATION = str.maketrans(
+    {
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u201c": '"',
+        "\u201d": '"',
+        "\u2013": "-",
+        "\u2014": "-",
+        "\u2026": "...",
+        "\u00a0": " ",
+    }
+)
+
+#: Any run of whitespace — including the double space a dropped emoji leaves
+#: behind, and a line break — becomes one space on the panel.
+_SPACE_RUN_RE = re.compile(r"\s+")
+
+
+def to_ascii(text: str) -> str:
+    """Fold *text* down to the ASCII the panel's font can draw.
+
+    The device font has no glyph beyond ASCII, so an emoji (``🤔``) would draw as
+    a blank or a missing-glyph box. Accents are decomposed (``é`` → ``e``) and
+    the typographic punctuation models like is mapped to ASCII (``don’t`` →
+    ``don't``), so the meaning survives the fold; everything still outside ASCII
+    — emoji, their skin-tone/joiner modifiers, symbols, CJK — is dropped. The
+    leftovers are then squeezed to single spaces, because a dropped emoji leaves
+    a double space behind.
+    """
+    folded = unicodedata.normalize("NFKD", text.translate(_PUNCTUATION))
+    return _SPACE_RUN_RE.sub(" ", "".join(ch for ch in folded if ch.isascii()))
+
+
 def to_markup(runs: Sequence[Run], max_chars: int = MAX_OVERRIDE_CHARS) -> str:
     """Colour runs → LVGL inline-recolour text, truncated to *max_chars*.
 
@@ -152,20 +200,31 @@ def to_markup(runs: Sequence[Run], max_chars: int = MAX_OVERRIDE_CHARS) -> str:
     terminates the command and is not drawn, and the closing ``#`` reverts to the
     label's ``text_color`` — while a white run is emitted plainly. A literal
     ``#`` is dropped: it delimits a command and this LVGL version's ``##`` escape
-    is dead code.
+    is dead code. Each run is folded to ASCII first (:func:`to_ascii`) while
+    :data:`STRIP_EMOJI` is set, so an emoji never reaches the pad and never eats
+    into the budget below.
 
     *max_chars* bounds the **rendered** length because the device keeps a
     ``text`` override in a fixed buffer and rejects anything longer (see
     :data:`MAX_OVERRIDE_CHARS`). Truncation happens on a run boundary, so the
     markup always stays well-formed.
     """
+    texts: list[tuple[int, str]] = []
+    for run in runs:
+        text = (to_ascii(run.text) if STRIP_EMOJI else run.text).replace("#", "")
+        if not texts:
+            text = text.lstrip(" ")  # no blank space before the first drawn run
+        if text:
+            texts.append((run.colour, text))
+    if texts:  # no trailing space either (e.g. right after a dropped emoji)
+        colour, text = texts[-1]
+        texts[-1] = (colour, text.rstrip(" "))
     parts: list[str] = []
     used = 0
-    for run in runs:
-        text = run.text.replace("#", "")
+    for colour, text in texts:
         if not text:
             continue
-        opening, closing = ("", "") if run.colour == WHITE else (f"#{run.colour:06X} ", "#")
+        opening, closing = ("", "") if colour == WHITE else (f"#{colour:06X} ", "#")
         room = max_chars - used - len(opening) - len(closing)
         if room <= 0:
             break
