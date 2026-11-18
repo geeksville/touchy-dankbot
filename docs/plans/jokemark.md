@@ -1,12 +1,12 @@
-# dank-bot — plan: jokemark (a model bake-off for the quip stage)
+# touchy-dankbot — plan: jokemark (a model bake-off for the quip stage)
 
 **Where this sits.** This extends Stage 1/2 of
-[`initial.md`](initial.md) — the responder CLI (`dank-bot reply` /
-`dank-bot models`). It replaces the ad-hoc loop of
+[`initial.md`](initial.md) — the responder CLI (`dankbot reply` /
+`dankbot models`). It replaces the ad-hoc loop of
 
 ```sh
-dank-bot reply -f sim-overheard.txt --model A | tee a.txt
-dank-bot reply -f sim-overheard.txt --model B | tee b.txt
+dankbot reply -f sim-overheard.txt --model A | tee a.txt
+dankbot reply -f sim-overheard.txt --model B | tee b.txt
 # … eyeball two loose text files, forget which temperature they used
 ```
 
@@ -33,12 +33,12 @@ the bake-off never needs one.
 > * **Fetching** — `ChatClient.has_model` (tolerates implicit `:latest`) and
 >   `ChatClient.pull_model` (`POST /api/pull` `{"model", "stream": false}`),
 >   with `DEFAULT_PULL_TIMEOUT = 3600.0`.
-> * **CLI** — `dank-bot jokemark` with `--models`, `-f/--lines`, `-o/--out`,
+> * **CLI** — `dankbot jokemark` with `--models`, `-f/--lines`, `-o/--out`,
 >   `--url`, `--native`, `--timeout`, `--pull/--no-pull`, `--limit`,
 >   `--persona`, `--persona-file`, `--dry-run`; `just jokemark`.
 > * **Optional display (2026-11-17)** — `run_benchmark` takes a `display` sink
 >   (`dankbot.display.DisplaySink`) and hands it each non-skip reply's
->   `Reply.runs` — the same parsed runs `dank-bot listen` scrolls. `dank-bot
+>   `Reply.runs` — the same parsed runs `dankbot listen` scrolls. `dankbot
 >   jokemark` probes for a touchy-pad **once** at the start (`PadDisplay.start()`
 >   now returns whether anything was drawn) and passes `PadDisplay.show` only if
 >   one answers; a missing pad is ignored after one warning, so a long run does
@@ -66,7 +66,7 @@ the bake-off never needs one.
 > * **JSON sidecar + playback (2026-11-17)** — every run now also writes
 >   `<out>.json` beside the Markdown (`jokemark.json` by default): the same
 >   data, versioned, with replies *untruncated* and their colour runs included
->   (`render_json` / `load_report`). `dank-bot jokemark --playback FILE` replays
+>   (`render_json` / `load_report`). `dankbot jokemark --playback FILE` replays
 >   a report — no server, no model: each entry is logged (`label · overheard →
 >   REPLY: …` in its display colours, `SKIP(/notfunny)` for declines) and every
 >   non-skip reply is drawn on an attached pad, one second apart
@@ -90,7 +90,7 @@ the bake-off never needs one.
 
 ## Goal / summary
 
-`dank-bot jokemark` should:
+`dankbot jokemark` should:
 
 1. read a longer **overheard corpus** shipped inside the package
    (`dankbot/assets/overheard.txt`) — the six current `sim-overheard.txt`
@@ -140,7 +140,7 @@ set — it must not inherit `--model` / `--temperature` etc., because the matrix
 owns those.
 
 ```
-dank-bot jokemark [OPTIONS]
+dankbot jokemark [OPTIONS]
 
   --models FILE        TOML matrix (default: packaged jokemark-models.toml)
   -f, --lines FILE     overheard corpus (default: packaged overheard.txt)
@@ -195,10 +195,10 @@ with `importlib.resources`:
 from importlib import resources
 
 def packaged_text(name: str) -> str:
-    return (resources.files("dank-bot") / "assets" / name).read_text(encoding="utf-8")
+    return (resources.files("dankbot") / "assets" / name).read_text(encoding="utf-8")
 ```
 
-`files("dank-bot") / "assets" / …` works for an installed wheel (including a
+`files("dankbot") / "assets" / …` works for an installed wheel (including a
 zipped one) and for an editable install; the assets directory does **not** need
 an `__init__.py`. `pyproject.toml` gets an explicit
 `include = [{ path = "src/dankbot/assets", format = ["sdist", "wheel"] }]`
@@ -418,7 +418,7 @@ truncation: a versioned header (`url`, `corpus`, `persona`, `native`,
 | `src/dankbot/cli.py` | add the `jokemark` command (thin: options → `load_*` / `run_benchmark` → `render_markdown` + `render_json` → write both files; `--playback` → `load_report` → `playback`); document it in the module docstring. |
 | `src/dankbot/logs.py` | `playback_line`: the dim `label · overheard →` prefix plus the quip in its display colours. |
 | `pyproject.toml` | explicit `include` for `src/dankbot/assets`. |
-| `justfile` | `jokemark *args: install` → `poetry run dank-bot jokemark {{args}}`; comment the manual workflow it replaces. |
+| `justfile` | `jokemark *args: install` → `poetry run dankbot jokemark {{args}}`; comment the manual workflow it replaces. |
 | `README.md` | a “Model bake-off” subsection; demote `reply -f sim-overheard.txt` to a smoke example. |
 | `AGENTS.md` | one row in the repo-layout table for `jokemark.py` + the assets dir. |
 | `tests/test_jokemark.py` | **new** — loaders, runner, Markdown + JSON renderers, `load_report` validation, playback (pad + pause), packaged-asset invariants. |
@@ -473,7 +473,7 @@ in `test_cli.py`, so tests never pull or chat for real.
 | **P1 — assets** | Write `overheard.txt` (6 + ~30 unique restaurant/dinner-party lines) and `jokemark-models.toml` (2 models + 2 sampler variants); add the `pyproject.toml` include. | `python -c` reads both via `importlib.resources`; `just build` + `unzip -l dist/dankbot-*.whl` shows both files; asset tests green. |
 | **P2 — fetch primitives** | `DEFAULT_PULL_TIMEOUT`, `ChatClient.has_model` / `pull_model`, `tests/test_server.py`. | Unit tests prove the `/api/pull` payload, `:latest` matching, and `DankbotError` normalisation; live check pulls an already-present model (fast no-op). |
 | **P3 — jokemark core** | `jokemark.py` (loaders + validation, runner with the error policy, Markdown renderer) and `tests/test_jokemark.py` with a recording fake client. | All tests network-free; renderer output contains one summary row per spec, stable row numbers, skip/error markers, and escaped `|`/newlines. |
-| **P4 — CLI + docs** | `dank-bot jokemark` wiring, `just jokemark`, README/AGENTS updates, CLI tests (`--dry-run`, `--no-pull`, `--limit`, `-o`). | `just lint` clean; `just test` green; `dank-bot jokemark --dry-run` prints 4 specs × 36 lines and writes nothing. |
+| **P4 — CLI + docs** | `dankbot jokemark` wiring, `just jokemark`, README/AGENTS updates, CLI tests (`--dry-run`, `--no-pull`, `--limit`, `-o`). | `just lint` clean; `just test` green; `dankbot jokemark --dry-run` prints 4 specs × 36 lines and writes nothing. |
 | **P5 — live baseline** | Real run against the server (`just jokemark`), inspect the report, record the outcome (and, if useful, keep one report in `docs/` as the baseline the next run is compared against). | `jokemark.md` has every section filled; timings and skip rates look sane; the two known models produce recognisably different quips. |
 
 P1–P4 are one small PR-sized change; P5 is a human-supervised live run (it

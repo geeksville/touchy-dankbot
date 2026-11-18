@@ -1,15 +1,15 @@
-"""The ``dank-bot`` command line.
+"""The ``dankbot`` command line.
 
 Four commands:
 
-* ``dank-bot reply`` — read overheard lines (``--line`` / ``-f FILE`` / stdin)
+* ``dankbot reply`` — read overheard lines (``--line`` / ``-f FILE`` / stdin)
   and print a witty reply for each (commands stripped; ``/notfunny`` suppresses).
-* ``dank-bot models`` — list the models the server has pulled.
-* ``dank-bot jokemark`` — the model bake-off: every model/params in a TOML
+* ``dankbot models`` — list the models the server has pulled.
+* ``dankbot jokemark`` — the model bake-off: every model/params in a TOML
   matrix against the packaged overheard corpus, rendered to a Markdown report
   plus a JSON sidecar; ``--playback FILE`` replays that JSON instead of
   talking to the server.
-* ``dank-bot listen`` — mic → Moonshine → gate → reply, scrolled on the pad.
+* ``dankbot listen`` — mic → Moonshine → gate → reply, scrolled on the pad.
 
 Config resolution is *flag → env → default*, implemented via click's
 ``default=`` + ``envvar=`` (see :mod:`dankbot.config`). The chat client is
@@ -143,7 +143,7 @@ def _enable_debug(_ctx: click.Context, _param: click.Parameter, value: bool) -> 
 def _debug_option(fn):
     """Attach the shared ``--debug`` flag (flag → ``DANKBOT_DEBUG`` → off) to *fn*.
 
-    Every command takes it, so ``dank-bot listen --debug`` (and the justfile's
+    Every command takes it, so ``dankbot listen --debug`` (and the justfile's
     ``just listen -- --debug``, which appends args *after* the subcommand) work.
     """
     return click.option(
@@ -199,7 +199,7 @@ def _make_display(screen_name: str, clear_after_s: float, display_mode: str) -> 
     display = PadDisplay(
         screen_name=screen_name, clear_after=clear_after_s, display_mode=display_mode
     )
-    display.start()  # the "I'm dank-bot" banner (connects lazily)
+    display.start()  # the "I'm dankbot" banner (connects lazily)
     return display
 
 
@@ -238,7 +238,7 @@ def _settings_for(spec: ModelSpec, url: str) -> Settings:
 
 
 @click.group()
-@click.version_option(__version__, prog_name="dank-bot")
+@click.version_option(__version__, prog_name="dankbot")
 def main() -> None:
     """Witty one-liners about overheard conversation, via a remote LLM."""
     logs.configure()
@@ -291,7 +291,7 @@ def reply(
         for source in _input_lines(line, file):
             _emit(responder.respond(source), json_out)
     except DankbotError as exc:
-        click.echo(f"dank-bot: {exc}", err=True)
+        click.echo(f"dankbot: {exc}", err=True)
         raise SystemExit(1) from exc
 
 
@@ -428,10 +428,10 @@ def listen(
     try:
         listener.run(source)
     except DankbotError as exc:
-        click.echo(f"dank-bot: {exc}", err=True)
+        click.echo(f"dankbot: {exc}", err=True)
         raise SystemExit(1) from exc
     except KeyboardInterrupt:  # pragma: no cover - interactive stop
-        click.echo("dank-bot: stopped.", err=True)
+        click.echo("dankbot: stopped.", err=True)
     finally:
         display.close()
 
@@ -450,7 +450,7 @@ def models(url: str, native: bool, timeout: float) -> None:
         for name in ChatClient(settings).list_models():
             click.echo(name)
     except DankbotError as exc:
-        click.echo(f"dank-bot: {exc}", err=True)
+        click.echo(f"dankbot: {exc}", err=True)
         raise SystemExit(1) from exc
 
 
@@ -565,7 +565,7 @@ def jokemark(
         )
         lines = load_lines(_read_asset_or_file(lines_file, CORPUS_ASSET), limit=limit)
     except JokemarkError as exc:
-        click.echo(f"dank-bot: {exc}", err=True)
+        click.echo(f"dankbot: {exc}", err=True)
         raise SystemExit(1) from exc
 
     if dry_run:
@@ -580,7 +580,7 @@ def jokemark(
 
     json_out = out.with_suffix(".json")
     if json_out == out:
-        click.echo("dank-bot: --out cannot end in .json — that is the sidecar", err=True)
+        click.echo("dankbot: --out cannot end in .json — that is the sidecar", err=True)
         raise SystemExit(1)
 
     logs.ensure_verbosity(logging.INFO)
@@ -625,14 +625,14 @@ def jokemark(
         try:
             path.write_text(content, encoding="utf-8")
         except OSError as exc:
-            click.echo(f"dank-bot: cannot write {path}: {exc}", err=True)
+            click.echo(f"dankbot: cannot write {path}: {exc}", err=True)
             raise SystemExit(1) from exc
         click.echo(f"wrote {path}")
     if interrupted:  # pragma: no cover - interactive stop
-        click.echo("dank-bot: interrupted — partial report written.", err=True)
+        click.echo("dankbot: interrupted — partial report written.", err=True)
         raise SystemExit(130)
     if not any(row.reply is not None for model in results for row in model.results):
-        click.echo("dank-bot: no model produced a reply.", err=True)
+        click.echo("dankbot: no model produced a reply.", err=True)
         raise SystemExit(1)
 
 
@@ -646,7 +646,7 @@ def _replay(path: Path, display_mode: str) -> None:
     try:
         report = load_report(path.read_text(encoding="utf-8"))
     except (OSError, JokemarkError) as exc:
-        click.echo(f"dank-bot: {exc}", err=True)
+        click.echo(f"dankbot: {exc}", err=True)
         raise SystemExit(1) from exc
 
     logs.ensure_verbosity(logging.INFO)
@@ -658,7 +658,7 @@ def _replay(path: Path, display_mode: str) -> None:
             display=display.show if display is not None else None,
         )
     except KeyboardInterrupt:  # pragma: no cover - interactive stop
-        click.echo("dank-bot: stopped.", err=True)
+        click.echo("dankbot: stopped.", err=True)
         return
     finally:
         if display is not None:

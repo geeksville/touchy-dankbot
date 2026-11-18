@@ -1,4 +1,4 @@
-# dank-bot — plan: LCD out (one display, two text layouts)
+# touchy-dankbot — plan: LCD out (one display, two text layouts)
 
 **Where this sits.** This extends `docs/plans/ledout.md` (Stage 3, *LED out*).
 That plan built `display.py` around a **single** full-panel scrolling label —
@@ -33,7 +33,7 @@ adds a second layout for *tall* panels, chosen automatically from
 ## Goal / vision
 
 ```
-  [ dank-bot listen ]
+  [ dankbot listen ]
      mic → gate → responder ──► Reply { runs }            (stage 4a / 1+2)
                                       │
                                       ▼
@@ -126,7 +126,7 @@ def resolve_mode(requested: str, height: int) -> str:
   `resolve_mode` still treats anything unexpected as `auto` rather than raising —
   a bad env var must not stop a performance.
 * Log the decision once per connection:
-  `dank-bot: display ready on 480x272 (jc4827w543, multiline, screen 'dank-bot')`.
+  `dankbot: display ready on 480x272 (jc4827w543, multiline, screen 'dankbot')`.
 
 ### Re-check on reconnect
 
@@ -135,7 +135,7 @@ def resolve_mode(requested: str, height: int) -> str:
 re-prepares when a *new* connection reports a different `(width, height)` than
 the cached one. That is the swap case:
 
-1. `dank-bot listen` starts with the LCD attached → multiline screen saved.
+1. `dankbot listen` starts with the LCD attached → multiline screen saved.
 2. The LCD is unplugged; a write fails → `_forget_pad()` (existing behaviour).
 3. An LED matrix is plugged in; the next quip reconnects, sees `32x8`, rebuilds
    and saves the scrolling screen, then writes the quip.
@@ -281,7 +281,7 @@ def _write_quip(self, pad, runs) -> bool:
         self._write(pad, to_markup(runs))   # one `text` override
         return True
     except Exception as exc:                # a lost pad is not fatal
-        log.warning("dank-bot: lost the touchy-pad (%s) — will reconnect", exc)
+        log.warning("dankbot: lost the touchy-pad (%s) — will reconnect", exc)
         return False
 ```
 
@@ -290,7 +290,7 @@ def _write_quip(self, pad, runs) -> bool:
   `recolor=True`, so colour works on the LCD exactly as on the matrix.
 * `show([])` / the idle clear writes `""`, which blanks whichever layout is
   active. No mode-specific clearing.
-* The startup banner (`"I'm dank-bot"`), lazy connect, retry-once, drop-the-pad
+* The startup banner (`"I'm dankbot"`), lazy connect, retry-once, drop-the-pad
   and reconnect behaviour are all shared.
 * The lock still serialises the reply worker and the idle-clear timer; nothing
   about a second mode adds concurrency.
@@ -319,7 +319,7 @@ def _write_quip(self, pad, runs) -> bool:
 ```
 
 Flag → env → default, like every other option. `--screen-name` still names the
-single saved screen (`F:host/s/dank-bot.pb`); the mode is a property of *that
+single saved screen (`F:host/s/dankbot.pb`); the mode is a property of *that
 panel's* build, not of the name, so swapping pads re-saves the same screen with
 the other layout.
 
@@ -334,7 +334,7 @@ green. L1–L3 need no hardware; L4 is docs, and L5 is the first real-panel chec
 | **L2** | Screen split + dispatch: `_build_scroll_screen` (moved verbatim) and `_build_panel_screen`; `_prepare` records `self._mode`; reconnect re-prepares on a size change. The LED path must stay byte-identical. | `just test` — existing scrolling assertions unchanged; new proto assertions for a 480×272 fake pad (DOTS, LEFT, inset rect, font 30); pad-swap test. |
 | **L3** | Wiring: `--display-mode` + env, `_make_display(..., display_mode)`, updated `FakeDisplay`, log line. | `just test` (CLI flag forwarding + default), `just lint`. |
 | **L4** | Docs/persona/README + the `ledout.md` cross-link. | Review; `just lint`; README quickstart reads correctly. |
-| **L5** | Hardware + simulator verification. | `TOUCHY_SIM_URL` run at 480×272 and 32×8; on the real `jc4827w543`: `dank-bot listen --fake sim-overheard.txt` then a live mic run; repeat on an LED matrix. Check colour, wrapping, ellipsis, idle clear and hot-swap. |
+| **L5** | Hardware + simulator verification. | `TOUCHY_SIM_URL` run at 480×272 and 32×8; on the real `jc4827w543`: `dankbot listen --fake sim-overheard.txt` then a live mic run; repeat on an LED matrix. Check colour, wrapping, ellipsis, idle clear and hot-swap. |
 
 **Definition of done for the stage:** with the LCD attached, a multi-colour quip
 appears as a wrapped text block; with the LED matrix attached, the same quip
@@ -401,7 +401,7 @@ dankbot.
   non-zero (click `Choice`).
 * **`just lint`** — ruff format + check.
 * **Manual, on hardware (L5)** — with the real `jc4827w543`:
-  `dank-bot listen --fake sim-overheard.txt` (colour + wrapping + idle clear),
+  `dankbot listen --fake sim-overheard.txt` (colour + wrapping + idle clear),
   then a live mic run; then repeat with an LED matrix attached, including
   swapping one for the other while `listen` is running. The simulator is
   advisory (it mirrors `long_mode` only as a word-wrap toggle), so the panel is
@@ -417,12 +417,12 @@ dankbot.
 | R4 | **Vertical overflow is silently cut on a very long model reply.** | The persona + `MAX_OVERRIDE_CHARS` bound length; `DOTS` shows a cue. [`quipfit.md`](quipfit.md) steps down a font tier so the common long quip fits outright; pagination remains the follow-up for tiny panels. |
 | R5 | **A pad swap is not noticed** because the same `Touchy` handle keeps reporting the old size. | A real swap means a new USB open (or a new process); the size re-check covers the lazy-reconnect path. If a stale handle is ever seen, `_forget_pad` on any write failure already covers it. |
 | R6 | **Two pads attached** — `touchy_open()` picks the first, so the mode follows whichever it picks. | Existing limitation (`ledout.md` R5); one pad at a time is the supported setup. |
-| R7 | **The screen name is shared between modes**, so a stale `dank-bot.pb` built for the other panel exists until the next `_prepare`. | `_prepare` always saves before loading, so the active screen is always freshly built for the panel in hand. |
+| R7 | **The screen name is shared between modes**, so a stale `dankbot.pb` built for the other panel exists until the next `_prepare`. | `_prepare` always saves before loading, so the active screen is always freshly built for the panel in hand. |
 | R8 | **The sim doesn't render glyph fitting**, so tests can pass while the real LCD ellipsizes. | Sim tests assert the proto (mode, rect, alignment), hardware checks the pixels; that split is deliberate. |
 
 ## Acceptance criteria (definition of done)
 
-1. With no flags on the attached 480×272 `jc4827w543`, `dank-bot listen` shows
+1. With no flags on the attached 480×272 `jc4827w543`, `dankbot listen` shows
    the startup banner and each quip as a **left-aligned, wrapped, multi-colour
    text block**, and the idle clear blanks it.
 2. With no flags on an 8-/32-px-tall LED matrix, the same run behaves exactly as

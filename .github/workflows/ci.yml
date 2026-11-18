@@ -56,5 +56,5 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v7
         with:
-          name: dank-bot-dist
+          name: touchy-dankbot-dist
           path: dist/*

@@ -1,10 +1,10 @@
-# dank-bot devcontainer image — a trimmed copy of the touchy-pad devcontainer.
+# touchy-dankbot devcontainer image — a trimmed copy of the touchy-pad devcontainer.
 #
 # Kept: Python + Poetry + just, USB (libusb) for the touchy-pad host library,
 # and userspace ALSA/PortAudio so a real USB microphone (the reSpeaker XVF3800)
 # works from inside the container.
 #
-# Stripped (dank-bot does not need them): the ESP-IDF/esp32 toolchain,
+# Stripped (touchy-dankbot does not need them): the ESP-IDF/esp32 toolchain,
 # Rust/Tauri, Deno, GTK/StreamController, the Qt runtime for the touchy-pad
 # simulator GUI, and protoc/nanopb (the published `touchy-pad` wheel ships its
 # own proto bindings).
@@ -23,7 +23,7 @@ RUN apt-get update \
       sudo curl ca-certificates zsh git locales gnupg gpgv \
  && rm -rf /var/lib/apt/lists/*
 
-# Python + the native libraries dank-bot uses at runtime:
+# Python + the native libraries touchy-dankbot uses at runtime:
 #   python3*-dev / build-essential / pkg-config - build the occasional sdist.
 #   libusb-1.0-0 + usbutils                    - pyusb (the touchy-pad host
 #                                                library) dlopens libusb;

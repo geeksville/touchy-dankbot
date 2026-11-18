@@ -1,15 +1,15 @@
-# dank-bot — Poetry project.
+# touchy-dankbot — Poetry project.
 #
-# The distribution (PyPI) name and the console script are `dank-bot`; the import
-# package is `dankbot` (a hyphen cannot appear in a Python identifier, and
-# `dankbot` reads better in code than dissertation-length names).
+# The distribution (PyPI) name is `touchy-dankbot`; the console script and the
+# import package are both `dankbot` (a hyphen cannot appear in a Python
+# identifier, and `dankbot` reads better in code than dissertation-length names).
 # The `touchy-pad` host library comes from
 # PyPI, not a local path checkout — `just use-touchy-local` clones upstream into
 # reference/touchy-pad and swaps in that checkout's app/ tree while hacking on
 # the host library itself. See docs/plans/standalone.md.
 
 [tool.poetry]
-name = "dank-bot"
+name = "touchy-dankbot"
 version = "0.1.0"
 description = "An eavesdropping desk robot: witty one-liners about overheard conversation, via a remote LLM."
 authors = ["Touchy-Pad contributors"]
@@ -42,7 +42,7 @@ openai = ">=1.40"
 click = ">=8.1"
 # Only for the native Ollama /api/chat fallback (exact sampler control).
 requests = ">=2.31"
-# Speech-to-text for `dank-bot listen` — Moonshine Voice streaming models,
+# Speech-to-text for `dankbot listen` — Moonshine Voice streaming models,
 # CPU-friendly for the Raspberry Pi target. It bundles its own native library
 # (no onnxruntime dependency) and ships prebuilt x86_64 + arm64 wheels.
 moonshine-voice = "^0.1.5"
@@ -55,9 +55,9 @@ sounddevice = "^0.5.6"
 # import honest. `>=13.7` is the first line that carries everything logs.py
 # uses (RichHandler + truecolor `#rrggbb` Text styles).
 rich = ">=13.7"
-# The touchy-pad host library + screen DSL, driven by `dank-bot listen`
+# The touchy-pad host library + screen DSL, driven by `dankbot listen`
 # (src/dankbot/display.py). Pulled from PyPI; the floor is the first
-# release that carries the host API dank-bot uses (`SetPropertiesCmd` /
+# release that carries the host API dankbot uses (`SetPropertiesCmd` /
 # `build_property_override` + `Label.recolor` from 0.3.5, and
 # `Label.scroll_speed_px_s` from 0.3.8, which sets the marquee speed) — anything
 # older breaks the display. The long-quip font step-down additionally needs
@@ -68,17 +68,17 @@ rich = ">=13.7"
 touchy-pad = ">=0.4.0"
 
 [tool.poetry.urls]
-Homepage = "https://github.com/geeksville/dank-bot"
-Repository = "https://github.com/geeksville/dank-bot"
-Issues = "https://github.com/geeksville/dankbot/issues"
-Changelog = "https://github.com/geeksville/dankbot/releases"
+Homepage = "https://github.com/geeksville/touchy-dankbot"
+Repository = "https://github.com/geeksville/touchy-dankbot"
+Issues = "https://github.com/geeksville/touchy-dankbot/issues"
+Changelog = "https://github.com/geeksville/touchy-dankbot/releases"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8"
 ruff = ">=0.8"
 
 [tool.poetry.scripts]
-dank-bot = "dankbot.cli:main"
+dankbot = "dankbot.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -13,7 +13,7 @@ inline-recolour markup, plus its ``text_font`` pixel size so a long reply steps
 down to a smaller compiled font instead of being ellipsized — never a screen
 re-upload (``docs/plans/quipfit.md``).
 
-This is the **only** module that imports ``touchy_pad``, so pulling dank-bot out
+This is the **only** module that imports ``touchy_pad``, so pulling dankbot out
 to its own repo stays a one-file diff plus the PyPI switch — and the import is
 *lazy* (inside the functions that need it) so the module can be imported and
 unit-tested without the host library installed.
@@ -49,14 +49,14 @@ DisplaySink = Callable[[tuple[Run, ...]], bool | None]
 #: On-device screen + widget names — the contract between the saved screen and
 #: the runtime property overrides. Deliberately *not* ``default`` so a later
 #: ``touchy init`` / ``touchy screen demo`` cannot clobber it (or vice-versa).
-SCREEN_NAME = "dank-bot"
+SCREEN_NAME = "dankbot"
 LABEL_ID = "dankbot_msg"
 
 #: What the panel shows on connect, and the colour LVGL draws unmarked text in.
-STARTUP_TEXT = "I'm dank-bot"
+STARTUP_TEXT = "I'm dankbot"
 WHITE = 0xFFFFFF
 
-#: The label font sizes dank-bot chooses between. The device renders only the
+#: The label font sizes dankbot chooses between. The device renders only the
 #: fonts its build compiled: 8 (LVGL's UNSCII bitmap face), 14 (Montserrat, the
 #: theme default), 16 and 30. 14 is skipped on purpose — it is barely smaller
 #: than 16, and 16 is glass-clear where 14 is not. See ``docs/plans/quipfit.md``.
@@ -71,7 +71,7 @@ FONT_SIZES = (8, 16, 30)
 FONT_PROPERTY = "text_font"
 
 #: The two text layouts, plus ``auto`` — pick by panel height. ``auto`` is what
-#: ``dank-bot listen`` uses; the explicit modes are an escape hatch for a panel
+#: ``dankbot listen`` uses; the explicit modes are an escape hatch for a panel
 #: the height rule classifies badly (e.g. a 64x64 LED matrix).
 MODE_AUTO = "auto"
 MODE_SCROLL = "scroll"
@@ -331,7 +331,7 @@ def _safe_close(pad: Any) -> None:
     try:
         pad.close()
     except Exception:
-        log.debug("dank-bot: closing the pad failed", exc_info=True)
+        log.debug("dankbot: closing the pad failed", exc_info=True)
 
 
 class PadDisplay:
@@ -414,11 +414,11 @@ class PadDisplay:
         try:
             lvgl = to_markup(runs)
             font = self._font_for_quip(runs)
-            log.debug("dank-bot: rendering quip at %dpx: %s", font, lvgl)
+            log.debug("dankbot: rendering quip at %dpx: %s", font, lvgl)
             self._write(pad, lvgl, font)
             return True
         except Exception as exc:  # noqa: BLE001 — a lost pad is not fatal
-            log.warning("dank-bot: lost the touchy-pad (%s) — will reconnect", exc)
+            log.warning("dankbot: lost the touchy-pad (%s) — will reconnect", exc)
             return False
 
     def _font_for_quip(self, runs: Sequence[Run]) -> int:
@@ -448,7 +448,7 @@ class PadDisplay:
             try:
                 self._prepare(self._pad)
             except Exception as exc:  # noqa: BLE001 — a bad pad is not fatal
-                log.warning("dank-bot: found a touchy-pad but can't drive it (%s)", exc)
+                log.warning("dankbot: found a touchy-pad but can't drive it (%s)", exc)
                 self._forget_pad()
                 return None
             self._prepared = True
@@ -456,7 +456,7 @@ class PadDisplay:
             info = getattr(self._pad, "board_info", None)
             board = getattr(info, "board_name", "") or "?"
             log.info(
-                "dank-bot: display ready on %dx%d (%s, %s, screen %r)",
+                "dankbot: display ready on %dx%d (%s, %s, screen %r)",
                 width,
                 height,
                 board,
@@ -486,11 +486,9 @@ class PadDisplay:
                 return connect()
             except Exception as exc:  # noqa: BLE001 — a failed connect is a retry reason
                 if attempt + 1 < CONNECT_ATTEMPTS:
-                    log.debug(
-                        "dank-bot: connect attempt %d failed (%s); retrying", attempt + 1, exc
-                    )
+                    log.debug("dankbot: connect attempt %d failed (%s); retrying", attempt + 1, exc)
                     continue
-                log.warning("dank-bot: no touchy-pad to show this on (%s)", exc)
+                log.warning("dankbot: no touchy-pad to show this on (%s)", exc)
         return None
 
     def _prepare(self, pad: Any) -> None:
@@ -579,7 +577,7 @@ class PadDisplay:
             if len(entries) == 1 or self._font_unsupported or not _is_refusal(exc):
                 raise
             log.info(
-                "dank-bot: this pad's firmware has no %r override — showing the "
+                "dankbot: this pad's firmware has no %r override — showing the "
                 "quip at the screen's own font",
                 FONT_PROPERTY,
             )
@@ -614,5 +612,5 @@ class PadDisplay:
             try:
                 self._write(self._pad, "")
             except Exception:
-                log.debug("dank-bot: idle clear failed", exc_info=True)
+                log.debug("dankbot: idle clear failed", exc_info=True)
                 self._forget_pad()

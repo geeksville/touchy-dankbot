@@ -1,4 +1,4 @@
-# jokemark model matrix — the plan for `dank-bot jokemark`.
+# jokemark model matrix — the plan for `dankbot jokemark`.
 #
 # Every `[[models]]` entry is one *bank* of runs: a model plus the sampler it is
 # chatted with, run against every line of the packaged overheard corpus. TOML

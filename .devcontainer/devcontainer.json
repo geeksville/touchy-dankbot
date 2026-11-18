@@ -1,5 +1,5 @@
 {
-	"name": "dank-bot",
+	"name": "touchy-dankbot",
 	"build": {
 		"dockerfile": "Containerfile",
 		"context": ".",

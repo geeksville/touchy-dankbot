@@ -1,4 +1,4 @@
-# dank-bot — dev tasks (Poetry project). See docs/plans/standalone.md.
+# touchy-dankbot — dev tasks (Poetry project). See docs/plans/standalone.md.
 
 # List available recipes.
 default:
@@ -25,12 +25,12 @@ build:
 # Examples: `just reply -- --line "the bread is done baking"`
 #           `just reply -- -f sim-overheard.txt`
 reply *args: install
-    poetry run dank-bot reply {{args}}
+    poetry run dankbot reply {{args}}
 
 # Listen to the mic, transcribe, and scroll a witty reply per utterance on the pad.
 # `--fake FILE` replays a text file instead (no mic, no model).
 listen *args: install
-    poetry run dank-bot listen {{args}}
+    poetry run dankbot listen {{args}}
 
 # --- touchy-pad dependency ---------------------------------------------------
 # The default dependency is the *published* touchy-pad package (see
@@ -69,7 +69,7 @@ use-touchy-local:
     # An editable install from a clone needs the protoc-generated bindings
     # (app/src/touchy_pad/_proto/*_pb2.py), which upstream gitignores and only
     # generates for releases. Build them with upstream's own recipe, feeding it a
-    # throwaway venv that has grpcio-tools (so dank-bot's dependencies stay lean).
+    # throwaway venv that has grpcio-tools (so dankbot's dependencies stay lean).
     if [ ! -x "$proto_py" ]; then
         python3 -m venv reference/.proto-venv
     fi
@@ -130,7 +130,7 @@ use-touchy-pypi:
 
 # List the models the remote server has pulled.
 models *args: install
-    poetry run dank-bot models {{args}}
+    poetry run dankbot models {{args}}
 
 # Bake off the quip stage: every model/params in the packaged matrix against the
 # packaged overheard corpus, writing a Markdown report plus a JSON sidecar
@@ -139,7 +139,7 @@ models *args: install
 #           `just jokemark -- --models mine.toml -o report.md`;
 #           `just jokemark -- --playback jokemark.json` (no server; pad optional)
 jokemark *args: install
-    poetry run dank-bot jokemark {{args}}
+    poetry run dankbot jokemark {{args}}
 
 # --- release -----------------------------------------------------------------
 

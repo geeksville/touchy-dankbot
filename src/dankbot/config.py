@@ -5,7 +5,7 @@ that precedence for us (``default=`` + ``envvar=`` on every option), so this
 module only owns the default values and the frozen dataclass they feed.
 
 Env names mirror ``launch-funny.sh``'s ``TOUCHY_BOT_*`` but are rebranded
-``DANKBOT_*`` (the repo is finally called dank-bot). The script's
+``DANKBOT_*`` (the repo is finally called touchy-dankbot). The script's
 ``TOUCHY_BOT_NGL`` — GPU layers to offload — has no remote analogue and is
 dropped.
 """

@@ -18,16 +18,16 @@ tracked in git.
 
 ## Existing plans
 
-- `docs/plans/initial.md` — the original dank-bot plan (the responder CLI).
+- `docs/plans/initial.md` — the original touchy-dankbot plan (the responder CLI).
 - `docs/plans/audioin.md` — the audio-in stage (mic → Moonshine → gate → reply).
 - `docs/plans/ledout.md` — the LED-out stage (scroll quips on a touchy-pad).
 - `docs/plans/lcdout.md` — LCD out: tall panels wrap the quip in a multiline
   text field; `<= 32`-px-tall panels keep the scrolling marquee.
 - `docs/plans/quipfit.md` — quip fit: a long reply steps down to a smaller
   compiled font (`text_font` override) instead of being ellipsized.
-- `docs/plans/standalone.md` — extracting dank-bot to its own repo (packaging,
+- `docs/plans/standalone.md` — extracting touchy-dankbot to its own repo (packaging,
   PyPI name, CI, devcontainer).
-- `docs/plans/jokemark.md` — the model bake-off (`dank-bot jokemark`): packaged
+- `docs/plans/jokemark.md` — the model bake-off (`dankbot jokemark`): packaged
   overheard corpus × TOML model matrix → one Markdown report.
 
 Docs that are *not* plans: `docs/TODO.md` (loose backlog), `docs/hardware.md`

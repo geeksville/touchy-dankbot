@@ -93,7 +93,7 @@ class FakePad:
 
 
 def saved_label(pad: FakePad, index: int = 0):
-    """The dank-bot label from the *index*th screen the fake pad saved.
+    """The dankbot label from the *index*th screen the fake pad saved.
 
     Needs the host library for the protobuf round-trip, so callers use
     ``pytest.importorskip`` first (this helper does it too, harmlessly).
@@ -315,7 +315,7 @@ def test_show_sends_one_text_override_and_builds_the_screen_once():
     PadDisplay(pad, clear_after=0).show([Run("Danger!", COLOURS["red"])])
     assert pad.texts() == ["#FF0000 Danger!#"]
     assert len(pad.saved) == 1
-    assert pad.loaded == ["F:host/s/dank-bot.pb"]
+    assert pad.loaded == ["F:host/s/dankbot.pb"]
 
 
 def test_start_shows_the_banner():

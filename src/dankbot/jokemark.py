@@ -11,7 +11,7 @@ fake and never pull or chat. Only :mod:`dankbot.cli` wires in the real client.
 A run may also be handed a **display sink** (the CLI passes ``PadDisplay.show``
 when a touchy-pad happens to be attached): every reply that is not a
 ``/notfunny`` skip is then drawn as it arrives, using the same parsed colour
-runs ``dank-bot listen`` shows. The device is entirely optional — no sink means
+runs ``dankbot listen`` shows. The device is entirely optional — no sink means
 "report only", and a sink that fails must never cost the bake-off its run.
 
 Every run is written twice: a Markdown report for a human
@@ -301,7 +301,7 @@ def run_benchmark(
     still render a partial report after Ctrl-C.
 
     *display*, when given, receives each non-skip reply's colour runs as the
-    reply arrives (the same ``Reply.runs`` ``dank-bot listen`` shows); it is
+    reply arrives (the same ``Reply.runs`` ``dankbot listen`` shows); it is
     optional and a failing sink is logged, never fatal.
     """
     results: list[ModelResult] = []

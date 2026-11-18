@@ -133,7 +133,7 @@ def make_handler(*, level: int = logging.NOTSET, console: Console | None = None)
 
     *level* defaults to ``NOTSET``: as with ``basicConfig``, it is the *root
     logger's* level (set by :func:`configure`) that decides what is emitted, so a
-    ``dankbot`` logger raised to INFO (``dank-bot listen``) still gets through.
+    ``dankbot`` logger raised to INFO (``dankbot listen``) still gets through.
     """
     return _Handler(
         level=level,

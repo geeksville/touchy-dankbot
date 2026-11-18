@@ -1,4 +1,4 @@
-# dank-bot — plan: quip fit (step the font down instead of clipping the quip)
+# touchy-dankbot — plan: quip fit (step the font down instead of clipping the quip)
 
 **Where this sits.** This extends the **multiline** layout from
 [`lcdout.md`](lcdout.md) (Stage 3, *LCD out*). That plan built one wrapped text
@@ -152,7 +152,7 @@ def _write(self, pad, text, font=None):
 * `_write_quip` logs `rendering quip at 16px: …` so the choice is visible in
   `--debug`.
 * The font is sent **every** quip, not only when it changes: overrides are
-  sticky on the *device*, so a size left behind by an earlier dank-bot run would
+  sticky on the *device*, so a size left behind by an earlier dankbot run would
   otherwise survive a restart. (The idle clear sends text only.)
 * An explicit `PadDisplay(font_size=…)` becomes the ceiling, so a pinned size is
   never exceeded — but the quip may still step *below* it when it has to.

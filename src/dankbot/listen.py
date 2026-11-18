@@ -118,7 +118,7 @@ class Listener:
     def _start(self) -> None:
         if self._inline or self._thread is not None:
             return
-        self._thread = threading.Thread(target=self._worker, name="dank-bot-reply", daemon=True)
+        self._thread = threading.Thread(target=self._worker, name="dankbot-reply", daemon=True)
         self._thread.start()
 
     def close(self) -> None:

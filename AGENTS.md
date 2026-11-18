@@ -1,8 +1,8 @@
-# dank-bot — AI agent guide
+# touchy-dankbot — AI agent guide
 
 `CLAUDE.md` is a symlink to this file — keep them in sync via the symlink.
 
-`dank-bot` is an eavesdropping desk robot: it listens to nearby conversation,
+`dankbot` is an eavesdropping desk robot: it listens to nearby conversation,
 asks a small LLM (a remote [Ollama] server) for a witty one-liner, and scrolls
 that line across an addressable-LED matrix (a [touchy-pad]). It is the AI half
 of the **creep3r** art project. This repo is standalone: it depends on the
@@ -116,7 +116,7 @@ just bump-version          # bump version, commit, tag, push
 `just bump-version [X.Y.Z]` bumps the patch version, commits, tags `vX.Y.Z` and
 pushes. Publishing a GitHub Release then triggers
 `.github/workflows/release.yml`, which tests, builds, and publishes
-`dank-bot` to PyPI via OIDC trusted publishing. `testpypi.yml` is a manual
+`touchy-dankbot` to PyPI via OIDC trusted publishing. `testpypi.yml` is a manual
 dry-run to TestPyPI.
 
 ## Working with this repo (agent rules)

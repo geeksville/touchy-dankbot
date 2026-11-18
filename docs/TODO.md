@@ -1,5 +1,5 @@
 misc
-* !fix scrolling rate - done: touchy-pad LB19 `scroll_speed_px_s`, dank-bot scrolls at 20 px/s (`DEFAULT_SCROLL_SPEED_PX_S`)
+* !fix scrolling rate - done: touchy-pad LB19 `scroll_speed_px_s`, dankbot scrolls at 20 px/s (`DEFAULT_SCROLL_SPEED_PX_S`)
 * do touchy release
 * !use funnier model - done: `DEFAULT_MODEL` is Rocinante-X 12B Q4_K_M (jokemark pick)
 * !use colors for empasis
@@ -84,7 +84,7 @@ While end-to-end audio LLMs are exciting, the most flexible way to get **actual 
 
 ## hw options
 
-For a witty local dank-bot, the main bottleneck is **RAM capacity and memory bandwidth**—moving from a `1.5B–3B` model up to an `8B–14B` model (`Llama-3.1-8B`, `Qwen3-8B`, `Mistral-Nemo-12B`) drastically improves humor and wordplay.
+For a witty local dankbot, the main bottleneck is **RAM capacity and memory bandwidth**—moving from a `1.5B–3B` model up to an `8B–14B` model (`Llama-3.1-8B`, `Qwen3-8B`, `Mistral-Nemo-12B`) drastically improves humor and wordplay.
 
 Here are the best hardware alternatives to the Raspberry Pi 5 in the **$250–$400** range:
 

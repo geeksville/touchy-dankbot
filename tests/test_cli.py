@@ -158,7 +158,7 @@ def test_debug_env_lowers_logging_to_debug(monkeypatch):
 
 def test_version_option():
     result = CliRunner().invoke(cli.main, ["--version"])
-    assert "dank-bot" in result.output
+    assert "dankbot" in result.output
 
 
 def test_listen_fake_replays_utterances(monkeypatch, tmp_path):

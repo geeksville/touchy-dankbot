@@ -15,9 +15,9 @@ started before re-running the same line.
 - **`just test`** — fast and network-free. `DANKBOT_LIVE=1 just test` hits the
   real remote server, and the live audio test opens the mic and may download a
   Moonshine model.
-- **`dank-bot listen`** — runs until Ctrl-C (it streams the mic). Never run it in
+- **`dankbot listen`** — runs until Ctrl-C (it streams the mic). Never run it in
   the foreground and wait: use `--fake FILE` for a finite, hardware-free run.
-- **`dank-bot reply` / `dank-bot models`** — one-shot, but need network to the
+- **`dankbot reply` / `dankbot models`** — one-shot, but need network to the
   Ollama server.
 - **Device I/O is not guaranteed.** No mic / no touchy-pad is the normal state in
   CI and on a dev box: use `--fake` and the fakes in `tests/` rather than

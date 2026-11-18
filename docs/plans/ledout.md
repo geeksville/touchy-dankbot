@@ -1,4 +1,4 @@
-# dank-bot — plan: LED out (scroll the quip on a touchy-pad)
+# touchy-dankbot — plan: LED out (scroll the quip on a touchy-pad)
 
 > **See also:** [`lcdout.md`](lcdout.md) extends this stage with a second layout
 > for tall panels (an LCD pad wraps the quip in a multiline text field; a
@@ -22,14 +22,14 @@ stages lb1–lb16); the first target is a single WS2812B matrix on a desk.
 > owner flashes + tests it on hardware once it lands.
 >
 > **Update (2026-11-06): the `--display {off,pad}` flag is gone.** Every
-> `dank-bot listen` run drives the pad — a missing / unplugged pad is just a
+> `dankbot listen` run drives the pad — a missing / unplugged pad is just a
 > logged warning — and the `listen-pad` just recipe went with it. Read the
 > `--display pad` mentions below as the default behaviour (historical record).
 
 ## Goal / vision
 
 ```
-  [ dank-bot listen ]
+  [ dankbot listen ]
      mic → gate → responder ──► Reply { runs }                (stage 4a / 1+2)
                                      │
                                      ▼
@@ -65,7 +65,7 @@ overrides — never another screen upload.
   the firmware / host-DSL / sim / Rust / docs work to honour it (the parent-repo
   half of this plan).
 * **A startup banner, a 2-minute idle clear, and lazy connect** — the panel shows
-  `I'm dank-bot` from startup, blanks after `--clear-after` seconds with nothing
+  `I'm dankbot` from startup, blanks after `--clear-after` seconds with nothing
   new, and only connects when there is something to show.
 * **Packaging** — the `touchy_pad` dependency (path first, PyPI later) plus the
   `just use-touchy-local` / `just use-touchy-pypi` recipes.
@@ -75,7 +75,7 @@ overrides — never another screen upload.
 * **No multitouch / interaction.** The matrix is a pure output device here;
   nothing is read back from it.
 * **No graphics beyond scrolling text** (no bouncing shapes, no images). The
-  parent repo's `build_setup_screen_touchless` already covers pixels; dank-bot
+  parent repo's `build_setup_screen_touchless` already covers pixels; dankbot
   only needs a marquee.
 * **No always-on service wiring yet** — that is Stage 5. This stage is
   `listen`-shaped: it drives the pad only while replies arrive (and retries
@@ -95,13 +95,13 @@ overrides — never another screen upload.
 | Geometry from `pad.board_info` | The board reports `display_width` / `display_height` / `is_touchable`. Hard-coding 32×8 would break the LCD boards *and* the multi-panel `creep3r` pillar (stage lb10 chains) this same code must eventually serve. |
 | `click` flags + the existing `_LLM_OPTIONS` | Matches the rest of the CLI; the display is one more `listen` option, not a new program. |
 | Reuse googly-vr's **lazy connect / retry-on-next-reply** shape | A pad plugged in later gets picked up without a restart and an unplugged pad is never fatal — the pattern is already written and tested in `tools/googly-vr/src/googly_vr/cli.py`. |
-| `touchy_pad` import confined to `display.py` | `initial.md`'s extraction rule: pulling dank-bot out to its own repo stays a one-file diff plus the PyPI switch. |
+| `touchy_pad` import confined to `display.py` | `initial.md`'s extraction rule: pulling dankbot out to its own repo stays a one-file diff plus the PyPI switch. |
 
-## The `/command` contract — model output → dank-bot directives
+## The `/command` contract — model output → dankbot directives
 
 This stage replaces the bare `NOTFUNNY` sentinel (`responder.py` +
 `persona.is_notfunny`) with a tiny in-band command language: **a recognised
-command word in the model's output is a directive to dank-bot, never something
+command word in the model's output is a directive to dankbot, never something
 to display** (an unknown slash token is recovered as text — see the parsing
 rules below).
 
@@ -215,7 +215,7 @@ def parse(raw: str) -> ParsedReply: ...
 
 `Responder.respond()` calls `parse()` and `Reply` carries `runs` (plus `skip`).
 `display.py` is the **only** place that turns runs into LVGL markup
-(`#RRGGBB text#…`); logs, `--json` and `dank-bot reply` all use the plain
+(`#RRGGBB text#…`); logs, `--json` and `dankbot reply` all use the plain
 `text`.
 
 ## Removing the legacy `NOTFUNNY` token
@@ -225,7 +225,7 @@ The old sentinel goes away entirely (owner decision — no back-compat shim):
 * `persona.is_notfunny` and `persona.NOTFUNNY` are **deleted**; `/notfunny` is
   the only skip mechanism. `responder.py` uses `commands.parse` alone.
 * `--no-notfunny` is **dropped** (`/notfunny` is now part of the command
-  contract, not a special case); `dank-bot reply` prints the **stripped** text
+  contract, not a special case); `dankbot reply` prints the **stripped** text
   (what the LED will show), with `--json` also carrying the raw reply for
   debugging.
 * `tests/hermes.txt` — a recorded transcript with **no consumers** (no test reads
@@ -283,7 +283,7 @@ pad.screen_load(screen_path(SCREEN_NAME))
   traversal is still capped at 10 s and a *very* long quip scrolls faster than
   20 px/s. A fixed per-pass time would need `scroll_duration_ms` instead, which
   the host can only size if it knows the rendered text width.
-* **Name.** The screen is `dank-bot` (`--screen-name`), **not** `default`, so a
+* **Name.** The screen is `dankbot` (`--screen-name`), **not** `default`, so a
   later `touchy init` / `touchy screen demo` can't clobber it and vice-versa.
 * **Reconnect** rebuilds the screen and forgets the last-sent state.
 
@@ -311,7 +311,7 @@ device, no screen re-upload.
 
 ### Startup banner, idle clear, lazy connect
 
-* **At startup** the label is built with text `"I'm dank-bot"` (`STARTUP_TEXT`),
+* **At startup** the label is built with text `"I'm dankbot"` (`STARTUP_TEXT`),
   so the first thing the panel shows is the banner.
 * **Idle clear:** every shown message (re)arms a timer of `--clear-after` seconds
   (default **120**, `0` = never); when it expires, `show([])` — an empty string —
@@ -326,7 +326,7 @@ device, no screen re-upload.
   (`touchy pref from-template led-32x8`) once and keep looking (see *Decisions*
   #7).
 
-## dank-bot code changes
+## dankbot code changes
 
 | File | Change |
 |---|---|
@@ -363,14 +363,14 @@ Responder.respond(line) ─► Reply{runs, skip}
 
 ## Packaging: the `touchy-pad` dependency + `just` recipes
 
-This is the first dank-bot stage that needs the host library, so it is also where
+This is the first dankbot stage that needs the host library, so it is also where
 the dependency strategy is pinned (`initial.md` always intended it here).
 
 * **Default = path dep**, exactly like googly-vr:
   `touchy-pad = { path = "../../app", develop = true }` in the legacy
   `[tool.poetry]` layout (the file already explains *why* the legacy layout — the
   Poetry 2.x path-dep quirk).
-* **Two switch recipes** in dank-bot's `justfile`:
+* **Two switch recipes** in dankbot's `justfile`:
 
   | Recipe | Does |
   |---|---|
@@ -446,12 +446,12 @@ entry in the lightbar stage history (the **LB3 precedent** for a Label-widget
 stage; e.g. **LB17 — inline label recolour**) and an `AGENTS.md`/`CLAUDE.md`
 highlight bullet — the repo's "a stage isn't done until the docs say so" rule.
 
-> **Not dank-bot-specific.** Any host app can use `label(recolor=True)` +
-> `#RRGGBB …#`; dank-bot is simply its first consumer, which is why the plan
+> **Not dankbot-specific.** Any host app can use `label(recolor=True)` +
+> `#RRGGBB …#`; dankbot is simply its first consumer, which is why the plan
 > documents the feature in the parent repo rather than hiding it in dankbot.
 
 **The owner flashes + tests this on hardware** once the whole plan is
-implemented (per the `toai` note); dank-bot's D2 hardware milestone depends on
+implemented (per the `toai` note); dankbot's D2 hardware milestone depends on
 it.
 
 *(The optional sim-extends-`text_color` item from the earlier draft is dropped —
@@ -467,7 +467,7 @@ on-hardware check.
 > the real 8×8 pad.** **D0** (`/command` contract) ✅, **P1** (parent-repo
 > `Label.recolor`, stage LB17) ✅, **D1** (path dep + `use-touchy-*` recipes) ✅,
 > **D2** (`display.py` + `listen --display pad`) ✅, **D3** (CLI polish + docs) ✅.
-> dank-bot `just test` **86 passed / 2 skipped** and `just lint` clean; parent
+> dankbot `just test` **86 passed / 2 skipped** and `just lint` clean; parent
 > `just build-proto` / `just app-test` (**268 passed**) / `just app-lint` /
 > `just firmware-build` all green.
 >
@@ -484,7 +484,7 @@ on-hardware check.
 >    `pb_decode failed`): `SetPropertyCmd.string_value` was capped at 128 bytes,
 >    i.e. 127 characters of text. Raised to **512** in `proto/touchy.options`
 >    (511 characters of text — `max_size` counts the NUL terminator) and
->    re-flashed on every device; dank-bot truncates a longer reply to fit.
+>    re-flashed on every device; dankbot truncates a longer reply to fit.
 >
 > Remaining work is Stage 4/5 (STT filter, the full `creep3r` loop), not this plan.
 
@@ -496,7 +496,7 @@ on-hardware check.
 | **D2** | `display.py` (`connect`, `PadDisplay`, recolour screen build + `to_markup` + `show`, startup banner, idle clear, lazy connect), driven by `listen --display pad`. | `just test` with a **fake pad** (a stub with `board_info`/`screen_save`/`set_properties`); a manual `TOUCHY_SIM_URL` run; then hardware (needs **P1**). |
 | **D3** | CLI polish: `--display`, `--screen-name`, `--clear-after`, the `0×0` remedy message; README + `initial.md` updates. | `just lint`, `just test`, README quickstart. |
 
-**First hardware milestone** (after **P1** + **D2**): run `dank-bot listen --fake
+**First hardware milestone** (after **P1** + **D2**): run `dankbot listen --fake
 sim-overheard.txt --display pad` on a desk LED matrix and watch a multi-colour
 quip scroll; then `listen --display pad` on the real mic. That is the whole point
 of the stage.
@@ -513,7 +513,7 @@ recommended option.
 | 2 | **No per-reply colour state — rely on LVGL's default recolour behaviour.** Unmarked text renders in the label's `text_color` (white); only `#RRGGBB …#` runs are coloured. | Each reply is parsed in isolation, so nothing carries over and nothing needs resetting — the markup fully determines colour. |
 | 3 | **A `/cmd` is a directive anywhere**, stripped from the text; unknown → stripped + WARNING; nothing left → skip. | `commands.parse` returns ordered `Run`s. |
 | 4 | **`NOTFUNNY` is removed** (no legacy shim). | `persona.is_notfunny` / `NOTFUNNY` deleted; `hermes.txt` re-recorded. |
-| 5 | **Startup banner `"I'm dank-bot"`, cleared after 2 minutes** with nothing new; **lazy connect** — the pad is opened only when a message needs showing. | `--clear-after` (default 120 s); an idle-clear `threading.Timer`; connect-on-demand. |
+| 5 | **Startup banner `"I'm dankbot"`, cleared after 2 minutes** with nothing new; **lazy connect** — the pad is opened only when a message needs showing. | `--clear-after` (default 120 s); an idle-clear `threading.Timer`; connect-on-demand. |
 | 6 | **Font by panel height** from the compiled set (8 / 16 / 30), with a `--font-size` override; geometry always from `board_info`. | Never key off the board name; works on 32×8 and the LCDs unchanged. |
 | 7 | **On `0×0` (unprovisioned LED board), print the remedy once and keep looking** — never fail, never auto-provision. | One-line hint: `touchy pref from-template led-32x8`. |
 | 8 | **`poetry add`-based switch recipes** for `use-touchy-local` / `use-touchy-pypi`. | README notes the `pyproject.toml` + `poetry.lock` churn and the `git checkout` way back. |
@@ -576,14 +576,14 @@ label's `text_color`) — i.e. exactly LVGL's default recolour behaviour.
 
 ## Acceptance criteria (definition of done)
 
-1. `dank-bot listen` on the desk matrix scrolls each quip; a
+1. `dankbot listen` on the desk matrix scrolls each quip; a
    `/color/…` reply shows colour, **including several colours within one quip**;
    `/notfunny` shows nothing.
-2. The startup banner (`I'm dank-bot`) appears on connect, and the marquee clears
+2. The startup banner (`I'm dankbot`) appears on connect, and the marquee clears
    after `--clear-after` seconds with nothing new (default 120).
 3. Works on at least the 32×8 LED matrix **and** a large LCD board with **no code
    change** (geometry + font derived from `board_info`).
-4. `dank-bot listen --fake sim-overheard.txt` demonstrates the
+4. `dankbot listen --fake sim-overheard.txt` demonstrates the
    whole path with no mic and no model.
 5. `just test` green with no device, network or model; `just lint` clean; the
    existing `reply` / `listen` / `models` behaviour preserved.
@@ -627,7 +627,7 @@ label's `text_color`) — i.e. exactly LVGL's default recolour behaviour.
 Kept verbatim, so every decision above can be traced back to it:
 
 > * we are now doing stage 3 - outputing funny scrolling led messages to the attached touchypad
-> * use the touchypad api library to let dank-bot write to the leds
+> * use the touchypad api library to let dankbot write to the leds
 > * for now you can use the app/src/touchy_pad py library but eventually i want to use the version from pypi. add just rules for 'use-touchy-pypi' and 'use-touchy-local' to switch the poetry config
 > * initially we are targeting the 8x8 led version of touchypad but try not to assume that. ie. id like it to easily work on the large lcd versions also
 > * instead of the NOTFUNNY token in our LLM output change the system cmd and our usage to assume that LLM output words that start with '/' are system commands to our software. heres the commands to define now:
@@ -648,7 +648,7 @@ Also verbatim — these are the decisions recorded in *Decisions*:
 
 > toai: no need to keep legacy NOTFUNNY - remove it
 
-> toai: at startup default to "I'm dank-bot". after 2 minutes of no new replies
+> toai: at startup default to "I'm dankbot". after 2 minutes of no new replies
 > to show just clear it. btw: if not connected to a touchypad (because it was
 > initially not plugged in or it got removed) - reconnect when we have a new
 > message to show on it (ie connect to touchypad lazily)
