@@ -14,8 +14,8 @@ devcontainer, add CI + PyPI release workflows, and be movable out of
   ESP-IDF, Rust/Tauri, Deno, GTK/StreamController, the Qt runtime for the
   touchy-pad simulator GUI, and protoc/nanopb.
 - **`.github/workflows/`** — `ci.yml` (ruff + pytest + build, on
-  ubuntu/macos/windows), `release.yml` (test → OIDC PyPI publish on a GitHub
-  Release), `testpypi.yml` (manual dry run).
+  ubuntu/macos/windows), `release.yml` (test → OIDC PyPI publish on a pushed
+  `vX.Y.Z` tag), `testpypi.yml` (manual dry run).
 - **`pyproject.toml`** — distribution name **`touchy-dankbot`**;
   `touchy-pad` from PyPI (floor `0.4.0`, the first release carrying stage lb26 —
   see below);

@@ -114,10 +114,10 @@ just bump-version          # bump version, commit, tag, push
 ## Release
 
 `just bump-version [X.Y.Z]` bumps the patch version, commits, tags `vX.Y.Z` and
-pushes. Publishing a GitHub Release then triggers
-`.github/workflows/release.yml`, which tests, builds, and publishes
-`touchy-dankbot` to PyPI via OIDC trusted publishing. `testpypi.yml` is a manual
-dry-run to TestPyPI.
+pushes. Pushing that tag triggers `.github/workflows/release.yml`, which tests,
+builds, and publishes `touchy-dankbot` to PyPI via OIDC trusted publishing — no
+GitHub Release is needed (`release.yml` refuses a tag that does not match the
+version in `pyproject.toml`). `testpypi.yml` is a manual dry-run to TestPyPI.
 
 ## Working with this repo (agent rules)
 

@@ -279,7 +279,7 @@ just test                 # pytest (network-free)
 DANKBOT_LIVE=1 just test # + one real request to the server / the mic
 just lint                 # ruff format + check
 just build                # wheel + sdist into dist/
-just bump-version         # bump version, commit, tag, push (then release on GitHub)
+just bump-version         # bump version, commit, tag, push (tag → PyPI publish)
 ```
 
 The devcontainer (`.devcontainer/`) ships Python, Poetry, just, libusb (for the

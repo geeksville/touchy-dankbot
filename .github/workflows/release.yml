@@ -1,11 +1,20 @@
 name: Release
 
-# Triggered when a GitHub release is published via the UI (which `just
-# bump-version` + `git push` sets up). Runs the tests, builds the package, and
-# publishes it to PyPI via OIDC trusted publishing.
+# Triggered by pushing a version tag (`vX.Y.Z` — `just bump-version` creates and
+# pushes one). Runs the tests, builds the package, and publishes it to PyPI via
+# OIDC trusted publishing; no GitHub Release is needed.
+#
+# PyPI's trusted-publisher entry names the repository, this workflow *filename*
+# and the `pypi` environment — not the trigger — so moving from
+# `release: published` to a tag push needs no change on PyPI.
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+# Least privilege by default; the publish job widens it with its own block.
+permissions:
+  contents: read
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -16,6 +25,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
+      # A tag publishes whatever version the tree declares, so refuse a mismatch
+      # (e.g. a tag pushed without the matching `just bump-version` commit)
+      # instead of burning the version number on PyPI.
+      - name: Check the tag matches the package version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version=$(sed -n 's/^version = "\([0-9][0-9.]*\)"/\1/p' pyproject.toml | head -n1)
+          if [ "$tag" != "$version" ]; then
+            echo "::error::tag v$tag does not match pyproject.toml's version $version"
+            exit 1
+          fi
+          echo "Publishing touchy-dankbot $version from tag $GITHUB_REF_NAME"
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -56,6 +78,9 @@ jobs:
       name: pypi
       url: https://pypi.org/p/touchy-dankbot
     permissions:
+      # `contents: read` is required by attest-build-provenance, and a job-level
+      # block *replaces* the top-level one, so restate it here.
+      contents: read
       id-token: write
       attestations: write
     steps:
