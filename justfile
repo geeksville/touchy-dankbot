@@ -77,6 +77,9 @@ use-touchy-local:
     poetry install --no-interaction
 
 # Point the touchy-pad dependency back at the published PyPI package (the default).
+# NB: the long-quip font step-down needs stage lb26 (`SetPropertyCmd.font_size_value`,
+# the commit after v0.3.12). On an older host library that entry goes out as an
+# `int_value`, which the lb26 firmware refuses — the quip still shows, at full size.
 use-touchy-pypi:
     #!/usr/bin/env bash
     set -euo pipefail

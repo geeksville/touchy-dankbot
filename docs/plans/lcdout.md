@@ -25,6 +25,10 @@ adds a second layout for *tall* panels, chosen automatically from
 > protocol 14, touchable, USB. The LED path was verified on the real 8×8 matrix
 > (`docs/plans/ledout.md`, status block); 32×8 is the documented default panel.
 > Both must keep working.
+>
+> **See also:** [`quipfit.md`](quipfit.md) — a long quip steps down to a smaller
+> compiled font tier instead of being ellipsized; it supersedes the *Deferred*
+> item "font shrinking per reply" below.
 
 ## Goal / vision
 
@@ -252,7 +256,8 @@ preference — are:
 
 1. **Smaller font in multiline mode** (16 px gives 16 lines on the LCD). Cheap,
    still static, still one property write per quip. Would be a constant change,
-   not a protocol change.
+   not a protocol change, and is now planned per quip in
+   [`quipfit.md`](quipfit.md).
 2. **Host-side pagination**: split the rendered text into pages that fit, then
    rotate `text` overrides on a timer (the idle-clear timer machinery already
    shows how). This is "vertical scrolling" without a scrollable widget, at the
@@ -357,7 +362,9 @@ the next quip.
   reusing the spare space for an FPS/log widget. The pad is a quip display today.
 * **Touch gestures** — tap to dismiss, swipe for history. The LCD reports
   touches; wiring them is a separate stage.
-* **Font shrinking per reply** to make every quip fit.
+* **Font shrinking per reply** to make every quip fit — now done in
+  [`quipfit.md`](quipfit.md): the quip's drawn length picks a compiled font and
+  a `text_font` property override steps the label down.
 * **Using `is_touchable` as a second signal** for mode selection. Height is the
   rule; touch is context for logs and for the deferred gesture work.
 
@@ -405,9 +412,9 @@ voicebot.
 | # | Risk | Mitigation |
 |---|---|---|
 | R1 | **32 px is the wrong boundary for some panel** (e.g. a 64×64 LED matrix that should marquee, or a 32-px-tall LCD that should wrap). | `--display-mode` forces either layout; the rule stays a one-line constant (`PANEL_HEIGHT_THRESHOLD_PX`) if it needs tuning. |
-| R2 | **`DOTS` ellipsizes a quip that would have fitted with a smaller font.** | Quips are <100 chars by persona at 30 px on 464×256; if it bites, `font_for_panel` gets `MIN_PANEL_LINES = 3` or a smaller fixed size — a one-constant change. |
+| R2 | **`DOTS` ellipsizes a quip that would have fitted with a smaller font.** | Addressed by [`quipfit.md`](quipfit.md): the quip's drawn length picks a smaller compiled font, sent as a `text_font` override in the same batch as the text. |
 | R3 | **The device's `WRAP`/`DOTS` rendering differs from LVGL's upstream comment** (firmware may clamp the label box differently). | L5 checks on hardware; the proto round-trip is pinned by tests regardless. If `DOTS` misbehaves, the fallback is `WRAP` (wraps, then hard-clips at the fixed box) — **not** `CLIP`, which sets `expand = 1` and so does not wrap at all. |
-| R4 | **Vertical overflow is silently cut on a very long model reply.** | The persona + `MAX_OVERRIDE_CHARS` bound length; `DOTS` shows a cue; pagination is the recorded follow-up. |
+| R4 | **Vertical overflow is silently cut on a very long model reply.** | The persona + `MAX_OVERRIDE_CHARS` bound length; `DOTS` shows a cue. [`quipfit.md`](quipfit.md) steps down a font tier so the common long quip fits outright; pagination remains the follow-up for tiny panels. |
 | R5 | **A pad swap is not noticed** because the same `Touchy` handle keeps reporting the old size. | A real swap means a new USB open (or a new process); the size re-check covers the lazy-reconnect path. If a stale handle is ever seen, `_forget_pad` on any write failure already covers it. |
 | R6 | **Two pads attached** — `touchy_open()` picks the first, so the mode follows whichever it picks. | Existing limitation (`ledout.md` R5); one pad at a time is the supported setup. |
 | R7 | **The screen name is shared between modes**, so a stale `voicebot.pb` built for the other panel exists until the next `_prepare`. | `_prepare` always saves before loading, so the active screen is always freshly built for the panel in hand. |

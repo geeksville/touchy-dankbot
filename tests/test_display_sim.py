@@ -111,3 +111,26 @@ def test_a_tall_panel_gets_a_wrapped_text_field(lcd_sim):
         assert label.label.long_mode == LongMode.LONG_MODE_DOTS
     finally:
         display.close()
+
+
+def test_a_long_quip_shrinks_the_font_on_the_lcd(lcd_sim):
+    """The same one override carries the smaller ``text_font`` pixel size."""
+    display = PadDisplay(clear_after=0)
+    try:
+        display.show([Run("x" * 200)])
+        label = _label(lcd_sim)
+        assert label is not None, "the voicebot label was never built"
+        assert any(style.font_size == 16 for style in label.styles)
+    finally:
+        display.close()
+
+
+def test_a_short_quip_keeps_the_full_size_font(lcd_sim):
+    display = PadDisplay(clear_after=0)
+    try:
+        display.show([Run("Short.")])
+        label = _label(lcd_sim)
+        assert label is not None, "the voicebot label was never built"
+        assert not any(style.font_size == 16 for style in label.styles)
+    finally:
+        display.close()

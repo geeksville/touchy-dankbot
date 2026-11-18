@@ -9,7 +9,9 @@ Two layouts, picked from the panel height (``docs/plans/lcdout.md``):
 
 Both screens are built once per connection and saved; every quip afterwards is a
 single ``SetPropertiesCmd`` batch — the label's ``text``, carrying LVGL
-inline-recolour markup — never a screen re-upload.
+inline-recolour markup, plus its ``text_font`` pixel size so a long reply steps
+down to a smaller compiled font instead of being ellipsized — never a screen
+re-upload (``docs/plans/quipfit.md``).
 
 This is the **only** module that imports ``touchy_pad``, so pulling voicebot out
 to its own repo stays a one-file diff plus the PyPI switch — and the import is
@@ -54,9 +56,19 @@ LABEL_ID = "voicebot_msg"
 STARTUP_TEXT = "I'm voicebot"
 WHITE = 0xFFFFFF
 
-#: The label font sizes the firmware actually compiles (see the plan's Q6);
-#: any other size silently falls back to the theme default.
+#: The label font sizes voicebot chooses between. The device renders only the
+#: fonts its build compiled: 8 (LVGL's UNSCII bitmap face), 14 (Montserrat, the
+#: theme default), 16 and 30. 14 is skipped on purpose — it is barely smaller
+#: than 16, and 16 is glass-clear where 14 is not. See ``docs/plans/quipfit.md``.
 FONT_SIZES = (8, 16, 30)
+
+#: The LVGL style property that carries a label's font. An *int* value for this
+#: name means a pixel size: touchy-pad routes it to
+#: ``SetPropertyCmd.font_size_value`` (stage lb26) and the device maps it with
+#: ``font_for_size()``. Any other value arm aimed at it is refused — LVGL's real
+#: ``text_font`` value is a ``const lv_font_t *``, so an int would be read as a
+#: font pointer.
+FONT_PROPERTY = "text_font"
 
 #: The two text layouts, plus ``auto`` — pick by panel height. ``auto`` is what
 #: ``voicebot listen`` uses; the explicit modes are an escape hatch for a panel
@@ -152,6 +164,47 @@ def font_for_panel(height: int) -> int:
     return max(fits) if fits else FONT_SIZES[0]
 
 
+#: Average glyph advance as a fraction of the font's px size, for the Montserrat
+#: and UNSCII faces the firmware compiles. Real mixed-case text runs at ~0.50–0.55
+#: em; 0.62 is deliberately generous because this estimate only decides when to
+#: step *down* a font size: a false "it fits" is a clipped quip, a false "it
+#: doesn't" only costs a smaller — but still complete — quip.
+GLYPH_ADVANCE_RATIO = 0.62
+
+#: Line height as a multiple of the font px size (LVGL's Montserrat ≈ 1.19).
+LINE_HEIGHT_RATIO = 1.2
+
+
+def chars_that_fit(width: int, height: int, font: int) -> int:
+    """How many characters the multiline field draws at *font* px.
+
+    A rough, deliberately pessimistic estimate: the field's inner rectangle
+    (:func:`panel_inset`) divided into glyph cells. It only has to be right about
+    *which* compiled font the quip needs, and the tiers are far apart (30 → 16).
+    """
+    inset = panel_inset(height)
+    cols = max(1, int((width - 2 * inset) // (font * GLYPH_ADVANCE_RATIO)))
+    rows = max(1, int((height - 2 * inset) // (font * LINE_HEIGHT_RATIO)))
+    return cols * rows
+
+
+def font_for_text(width: int, height: int, chars: int, *, ceiling: int | None = None) -> int:
+    """The largest compiled font whose field fits *chars*; the smallest if none do.
+
+    *ceiling* is an explicitly configured size (:class:`PadDisplay`'s
+    ``font_size=``): it stays the largest tier, so a pinned font is never
+    exceeded. Sizes outside :data:`FONT_SIZES` are ignored rather than validated —
+    the device only renders the compiled ones either way.
+    """
+    tiers = sorted(FONT_SIZES, reverse=True)
+    if ceiling is not None:
+        tiers = [size for size in tiers if size <= ceiling] or tiers
+    for size in tiers:
+        if chars_that_fit(width, height, size) >= chars:
+            return size
+    return tiers[-1]
+
+
 #: Fold every quip to ASCII before it goes to the device (:func:`to_ascii`).
 #: **On** because the panel's font is ASCII-only today, so an emoji draws as a
 #: missing-glyph box. Set this to ``False`` once the device font has emoji
@@ -193,6 +246,35 @@ def to_ascii(text: str) -> str:
     return _SPACE_RUN_RE.sub(" ", "".join(ch for ch in folded if ch.isascii()))
 
 
+def _drawn_runs(runs: Sequence[Run]) -> list[tuple[int, str]]:
+    """The runs as the panel will draw them: ASCII-folded, hash-free, edges trimmed.
+
+    The one fold shared by :func:`to_markup` and :func:`visible_chars`, so the
+    characters we *budget* for are exactly the characters we *send*.
+    """
+    texts: list[tuple[int, str]] = []
+    for run in runs:
+        text = (to_ascii(run.text) if STRIP_EMOJI else run.text).replace("#", "")
+        if not texts:
+            text = text.lstrip(" ")  # no blank space before the first drawn run
+        if text:
+            texts.append((run.colour, text))
+    if texts:  # no trailing space either (e.g. right after a dropped emoji)
+        colour, text = texts[-1]
+        texts[-1] = (colour, text.rstrip(" "))
+    return texts
+
+
+def visible_chars(runs: Sequence[Run]) -> int:
+    """Characters the panel actually draws — the markup's ``#RRGGBB …#`` is not text.
+
+    A coloured run spends nine extra bytes on the wire (``#RRGGBB`` + space +
+    closing ``#``) that draw nothing, so measuring ``len(to_markup(...))`` would
+    shrink a quip the field has room for.
+    """
+    return sum(len(text) for _, text in _drawn_runs(runs))
+
+
 def to_markup(runs: Sequence[Run], max_chars: int = MAX_OVERRIDE_CHARS) -> str:
     """Colour runs → LVGL inline-recolour text, truncated to *max_chars*.
 
@@ -209,21 +291,9 @@ def to_markup(runs: Sequence[Run], max_chars: int = MAX_OVERRIDE_CHARS) -> str:
     :data:`MAX_OVERRIDE_CHARS`). Truncation happens on a run boundary, so the
     markup always stays well-formed.
     """
-    texts: list[tuple[int, str]] = []
-    for run in runs:
-        text = (to_ascii(run.text) if STRIP_EMOJI else run.text).replace("#", "")
-        if not texts:
-            text = text.lstrip(" ")  # no blank space before the first drawn run
-        if text:
-            texts.append((run.colour, text))
-    if texts:  # no trailing space either (e.g. right after a dropped emoji)
-        colour, text = texts[-1]
-        texts[-1] = (colour, text.rstrip(" "))
     parts: list[str] = []
     used = 0
-    for colour, text in texts:
-        if not text:
-            continue
+    for colour, text in _drawn_runs(runs):
         opening, closing = ("", "") if colour == WHITE else (f"#{colour:06X} ", "#")
         room = max_chars - used - len(opening) - len(closing)
         if room <= 0:
@@ -240,6 +310,19 @@ def _daemon_timer(delay_s: float, fn: Callable[[], None]) -> Timer:
     timer = Timer(delay_s, fn)
     timer.daemon = True
     return timer
+
+
+def _is_refusal(exc: BaseException) -> bool:
+    """True when the *device* answered ``INVALID_ARG`` — not a broken link.
+
+    The pad applies a property batch entry-by-entry and answers ``INVALID_ARG``
+    when an entry cannot be applied (e.g. a firmware that predates the
+    ``text_font`` override). Transport failures raise other exceptions, and those
+    must keep dropping the handle the way they always have.
+    """
+    from touchy_pad.api.errors import TouchyError
+
+    return isinstance(exc, TouchyError) and exc.code_name == "INVALID_ARG"
 
 
 def _safe_close(pad: Any) -> None:
@@ -281,6 +364,7 @@ class PadDisplay:
         self._font_size = font_size
         self._scroll_speed_px_s = scroll_speed_px_s
         self._timer_factory = timer_factory
+        self._font_unsupported = False
         self._lock = Lock()
         self._timer: Timer | None = None
         self._size: tuple[int, int] = (0, 0)
@@ -321,17 +405,36 @@ class PadDisplay:
     def _write_quip(self, pad: Any, runs: Sequence[Run]) -> bool:
         """Send the quip; ``False`` means the pad looks gone (drop the handle).
 
+        One ``SetPropertiesCmd`` batch carries the text *and* the font size this
+        quip needs (:func:`font_for_text`), so a long reply steps down to a
+        smaller compiled font instead of being ellipsized by ``DOTS``.
         :func:`to_markup` keeps the string inside the device's buffer, so a
         refusal here means the link itself is broken rather than a bad payload.
         """
         try:
             lvgl = to_markup(runs)
-            log.debug("voicebot: rendering quip: %s", lvgl)
-            self._write(pad, lvgl)
+            font = self._font_for_quip(runs)
+            log.debug("voicebot: rendering quip at %dpx: %s", font, lvgl)
+            self._write(pad, lvgl, font)
             return True
         except Exception as exc:  # noqa: BLE001 — a lost pad is not fatal
             log.warning("voicebot: lost the touchy-pad (%s) — will reconnect", exc)
             return False
+
+    def _font_for_quip(self, runs: Sequence[Run]) -> int:
+        """The font size this quip is drawn at.
+
+        The scrolling layout cannot overflow — it scrolls forever — so the marquee
+        keeps the one font its screen was built with. The multiline field has to
+        *fit*, so its font steps down while the quip is long. The font is written
+        with every quip rather than only on a change: overrides are sticky on the
+        **device**, so a size left behind by an earlier host run would otherwise
+        outlive a restart of voicebot.
+        """
+        width, height = self._size
+        if self._mode != MODE_MULTILINE:
+            return self._font_size or font_for(height)
+        return font_for_text(width, height, visible_chars(runs), ceiling=self._font_size)
 
     # -- the pad -----------------------------------------------------------
 
@@ -457,15 +560,36 @@ class PadDisplay:
         )
         return screen
 
-    def _write(self, pad: Any, text: str) -> None:
-        """One ``text`` property override — the whole per-quip cost."""
+    def _write(self, pad: Any, text: str, font: int | None = None) -> None:
+        """One ``SetPropertiesCmd`` batch: the text, plus the font when *font* is given.
+
+        A pad whose firmware predates the ``text_font`` override refuses the whole
+        batch (``INVALID_ARG``). That is not a lost pad, so retry with the text
+        alone — the quip still shows, at the screen's built font — and remember it
+        for the rest of this connection rather than failing every quip.
+        """
         from touchy_pad.api import build_property_override
 
-        pad.set_properties([build_property_override(LABEL_ID, "text", text)])
+        entries = [build_property_override(LABEL_ID, "text", text)]
+        if font is not None and not self._font_unsupported:
+            entries.append(build_property_override(LABEL_ID, FONT_PROPERTY, font))
+        try:
+            pad.set_properties(entries)
+        except Exception as exc:
+            if len(entries) == 1 or self._font_unsupported or not _is_refusal(exc):
+                raise
+            log.info(
+                "voicebot: this pad's firmware has no %r override — showing the "
+                "quip at the screen's own font",
+                FONT_PROPERTY,
+            )
+            self._font_unsupported = True
+            pad.set_properties(entries[:1])
 
     def _forget_pad(self) -> None:
         pad, self._pad = self._pad, None
         self._prepared = False
+        self._font_unsupported = False  # a different pad may support it
         _safe_close(pad)
 
     # -- the idle clear ----------------------------------------------------

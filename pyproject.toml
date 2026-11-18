@@ -58,7 +58,10 @@ rich = ">=13.7"
 # release that carries the host API voicebot uses (`SetPropertiesCmd` /
 # `build_property_override` + `Label.recolor` from 0.3.5, and
 # `Label.scroll_speed_px_s` from 0.3.8, which sets the marquee speed) — anything
-# older breaks the display. `just use-touchy-local` swaps in a path dep against
+# older breaks the display. The long-quip font step-down additionally needs
+# stage lb26 (`SetPropertyCmd.font_size_value`, the commit after v0.3.12), so
+# the PyPI floor must move to the first release that carries it.
+# `just use-touchy-local` swaps in a path dep against
 # a clone of upstream main (reference/touchy-pad/app) for host-library work.
 touchy-pad = {path = "reference/touchy-pad/app", develop = true}
 

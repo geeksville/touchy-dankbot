@@ -23,6 +23,8 @@ tracked in git.
 - `docs/plans/ledout.md` — the LED-out stage (scroll quips on a touchy-pad).
 - `docs/plans/lcdout.md` — LCD out: tall panels wrap the quip in a multiline
   text field; `<= 32`-px-tall panels keep the scrolling marquee.
+- `docs/plans/quipfit.md` — quip fit: a long reply steps down to a smaller
+  compiled font (`text_font` override) instead of being ellipsized.
 - `docs/plans/standalone.md` — extracting voicebot to its own repo (packaging,
   PyPI name, CI, devcontainer).
 - `docs/plans/jokemark.md` — the model bake-off (`voicebot jokemark`): packaged

@@ -14,6 +14,7 @@ import pytest
 from voicebot.commands import COLOURS, WHITE, Run
 from voicebot.display import (
     DEFAULT_SCROLL_SPEED_PX_S,
+    FONT_PROPERTY,
     FONT_SIZES,
     LABEL_ID,
     MAX_OVERRIDE_CHARS,
@@ -23,25 +24,31 @@ from voicebot.display import (
     STARTUP_TEXT,
     STRIP_EMOJI,
     PadDisplay,
+    chars_that_fit,
     font_for,
     font_for_panel,
+    font_for_text,
     panel_inset,
     resolve_mode,
     to_ascii,
     to_markup,
+    visible_chars,
 )
 
 
 class FakePad:
     """A duck-typed stand-in for a ``touchy_pad.api.Touchy``."""
 
-    def __init__(self, width: int = 32, height: int = 8, *, failures: int = 0) -> None:
+    def __init__(
+        self, width: int = 32, height: int = 8, *, failures: int = 0, reject_font: bool = False
+    ) -> None:
         self.board_info = SimpleNamespace(display_width=width, display_height=height)
         self.saved: list[object] = []
         self.loaded: list[str] = []
         self.batches: list[list[object]] = []
         self.closed = False
         self._failures = failures
+        self._reject_font = reject_font
 
     def screen_save(self, screen):
         self.saved.append(screen)
@@ -53,13 +60,36 @@ class FakePad:
         if self._failures > 0:
             self._failures -= 1
             raise RuntimeError("usb gone")
+        if self._reject_font and any(e.WhichOneof("value") == "font_size_value" for e in entries):
+            from touchy_pad.api.errors import TouchyError
+
+            raise TouchyError(2, "INVALID_ARG")  # a firmware without `text_font`
         self.batches.append(list(entries))
 
     def close(self):
         self.closed = True
 
     def texts(self) -> list[str]:
-        return [entry.string_value for batch in self.batches for entry in batch]
+        """The string-valued entries — the quips, without the font-size entries."""
+        return [
+            entry.string_value
+            for batch in self.batches
+            for entry in batch
+            if entry.WhichOneof("value") == "string_value"
+        ]
+
+    def fonts(self) -> list[int]:
+        """The ``text_font`` pixel sizes sent, one per quip."""
+        return [
+            entry.font_size_value
+            for batch in self.batches
+            for entry in batch
+            if entry.WhichOneof("value") == "font_size_value"
+        ]
+
+    def entry_names(self, batch: int = 0) -> list[str]:
+        """The property names of one batch, in order."""
+        return [entry.property_name for entry in self.batches[batch]]
 
 
 def saved_label(pad: FakePad, index: int = 0):
@@ -111,6 +141,23 @@ def test_a_coloured_run_is_truncated_within_budget():
 
 def test_markup_takes_a_smaller_budget():
     assert len(to_markup([Run("x" * 2000)], max_chars=64)) == 64
+
+
+# --- visible_chars (what actually has to fit) ------------------------------
+
+
+def test_visible_chars_counts_the_text():
+    assert visible_chars([Run("Time to toast!")]) == len("Time to toast!")
+
+
+def test_visible_chars_ignores_the_colour_markup():
+    runs = [Run("Look out "), Run("Danger!", COLOURS["red"])]
+    assert visible_chars(runs) == len("Look out Danger!")
+    assert len(to_markup(runs)) > visible_chars(runs)
+
+
+def test_visible_chars_counts_the_drawn_text_after_the_fold():
+    assert visible_chars([Run("  hi #tag \U0001f914 ")]) == len("hi tag")
 
 
 # --- to_ascii (the device font is ASCII-only) -------------------------------
@@ -218,6 +265,46 @@ def test_panel_padding_and_font(height, inset, font):
     assert panel_inset(height) == inset
     assert font_for_panel(height) == font
     assert font_for_panel(height) in FONT_SIZES
+
+
+# --- fitting a long quip ---------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("width", "height", "font", "capacity"),
+    [
+        (480, 272, 30, 168),  # the attached LCD: ~7 lines of 24 characters
+        (480, 272, 16, 598),  # more than the 511-character protocol cap
+        (128, 64, 16, 22),
+        (128, 48, 8, 69),
+    ],
+)
+def test_chars_that_fit(width, height, font, capacity):
+    assert chars_that_fit(width, height, font) == capacity
+
+
+def test_a_smaller_font_fits_more():
+    capacities = [chars_that_fit(480, 272, size) for size in sorted(FONT_SIZES, reverse=True)]
+    assert capacities == sorted(capacities)
+
+
+@pytest.mark.parametrize(
+    ("chars", "font"),
+    [(0, 30), (60, 30), (168, 30), (169, 16), (200, 16), (511, 16), (600, 8)],
+)
+def test_font_for_text_steps_down_for_a_long_quip(chars, font):
+    assert font_for_text(480, 272, chars) == font
+
+
+def test_font_for_text_never_leaves_the_compiled_sizes():
+    for chars in (0, 1, 500, 5000):
+        assert font_for_text(480, 272, chars) in FONT_SIZES
+    assert font_for_text(32, 8, 5000) in FONT_SIZES
+
+
+def test_font_for_text_keeps_an_explicit_size_as_the_ceiling():
+    assert font_for_text(480, 272, 10, ceiling=16) == 16  # never the 30-px tier
+    assert font_for_text(480, 272, 5000, ceiling=16) == 8  # may still step below
 
 
 # --- showing ---------------------------------------------------------------
@@ -337,6 +424,75 @@ def test_the_screen_is_not_rebuilt_per_quip():
     display.show([Run("b")])
     assert len(pad.saved) == 1
     assert pad.texts() == ["a", "b"]
+
+
+# --- the font tier per quip ------------------------------------------------
+
+
+def test_a_short_quip_keeps_the_lcd_font():
+    pad = FakePad(width=480, height=272)
+    PadDisplay(pad, clear_after=0).show([Run("Short and sweet.")])
+    assert pad.fonts() == [30]
+    assert pad.texts() == ["Short and sweet."]
+
+
+def test_a_long_quip_steps_down_to_the_smaller_font():
+    pad = FakePad(width=480, height=272)
+    PadDisplay(pad, clear_after=0).show([Run("x" * 200)])
+    assert pad.fonts() == [16]
+    assert len(pad.saved) == 1  # a property override, not a screen rebuild
+
+
+def test_the_text_and_the_font_are_one_batch():
+    pad = FakePad(width=480, height=272)
+    PadDisplay(pad, clear_after=0).show([Run("x" * 200)])
+    assert len(pad.batches) == 1
+    assert pad.entry_names() == ["text", FONT_PROPERTY]
+
+
+def test_the_marquee_keeps_its_font_however_long_the_quip():
+    pad = FakePad(width=32, height=8)
+    PadDisplay(pad, clear_after=0).show([Run("x" * 400)])
+    assert pad.fonts() == [8]
+    assert len(pad.saved) == 1
+
+
+def test_the_font_is_sent_every_quip_so_a_stale_override_cannot_stick():
+    """Overrides are sticky on the device — a restart must not inherit 16 px."""
+    pad = FakePad(width=480, height=272)
+    display = PadDisplay(pad, clear_after=0)
+    display.show([Run("x" * 200)])
+    display.show([Run("Short.")])
+    assert pad.fonts() == [16, 30]
+
+
+def test_an_explicit_font_size_is_never_exceeded():
+    pad = FakePad(width=480, height=272)
+    PadDisplay(pad, clear_after=0, font_size=16).show([Run("Short.")])
+    assert pad.fonts() == [16]
+
+
+def test_colour_markup_does_not_shrink_a_quip_that_fits():
+    """160 drawn characters fit at 30 px even though the markup is over 168."""
+    pad = FakePad(width=480, height=272)
+    body = "x" * 80
+    PadDisplay(pad, clear_after=0).show([Run(body), Run(body, COLOURS["red"])])
+    assert visible_chars([Run(body), Run(body, COLOURS["red"])]) == 160
+    assert pad.fonts() == [30]
+
+
+def test_a_pad_without_the_font_override_still_shows_the_quip():
+    """A pre-lb26 firmware refuses the batch — the text must still land."""
+    pad = FakePad(width=480, height=272, reject_font=True)
+    display = PadDisplay(pad, clear_after=0)
+    assert display.show([Run("x" * 200)]) is True
+    assert pad.texts() == ["x" * 200]
+    assert pad.fonts() == []
+    assert display._font_unsupported is True
+
+    display.show([Run("x" * 200)])  # the session remembers — no second failure
+    assert pad.texts() == ["x" * 200, "x" * 200]
+    assert len(pad.batches) == 2
 
 
 def test_connect_retries_once_on_a_transient_failure(monkeypatch):

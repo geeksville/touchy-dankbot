@@ -253,9 +253,15 @@ inline recolour on **both** layouts — e.g. `/color/red Danger ahead` shows
   on it. Nothing is fatal: no pad / an unplugged pad / an incompatible firmware
   all just log a warning and retry. Swapping an LED matrix for an LCD (or back)
   rebuilds the screen in the other layout on the next quip.
-* Geometry and the font size come from the board's reported display size, so the
+* Geometry and the base font come from the board's reported display size, so the
   same code drives an 8x8 / 32x8 LED matrix and a 480x272 LCD; 8/16/30 px are the
   compiled fonts, and the LCD picks the largest that leaves two lines.
+* A **long quip steps down to a smaller font** instead of being cut off: the
+  label's drawn length (colour markup excluded) is fitted to the field, and the
+  `text_font` pixel size rides in the same property batch as the text — ~170
+  characters fit at 30 px on the LCD, 500+ at 16 px. The marquee never needs
+  this (it scrolls forever). See
+  [docs/plans/quipfit.md](docs/plans/quipfit.md).
 * A **fresh LED board is headless** (`0x0`) until its panel chain is
   provisioned: `touchy pref from-template led-32x8`. voicebot says so if it sees
   `0x0`.
