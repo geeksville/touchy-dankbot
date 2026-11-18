@@ -34,23 +34,53 @@ listen *args: install
 
 # --- touchy-pad dependency ---------------------------------------------------
 # The default dependency is the *published* touchy-pad package (see
-# pyproject.toml). `use-touchy-local` swaps in the sibling ../../app checkout
-# while hacking on the host library itself; `use-touchy-pypi` restores the
-# published one. Both rewrite pyproject.toml + poetry.lock (committed files), so
-# the way back is `git checkout pyproject.toml poetry.lock`.
+# pyproject.toml). `use-touchy-local` clones/updates upstream and swaps in that
+# checkout's host library while hacking on touchy-pad itself; `use-touchy-pypi`
+# restores the published one. Both rewrite pyproject.toml + poetry.lock
+# (committed files), so the way back is
+# `git checkout pyproject.toml poetry.lock`.
 
-# Point the touchy-pad dependency at the sibling checkout (../../app).
+# Clone or fast-forward https://github.com/geeksville/touchy-pad.git into
+# reference/touchy-pad (git-ignored), generate the protobuf bindings upstream
+# keeps out of git, then depend on that checkout's app/ host library — i.e.
+# point the touchy-pad dependency at the latest upstream main.
 use-touchy-local:
     #!/usr/bin/env bash
     set -euo pipefail
-    poetry add --no-interaction --path ../../app --develop touchy-pad
+    checkout=reference/touchy-pad
+    # Absolute: upstream's Justfile chdirs into the checkout before running.
+    proto_py="$PWD/reference/.proto-venv/bin/python"
+    if [ -d "$checkout/.git" ]; then
+        if [ -n "$(git -C "$checkout" status --porcelain)" ]; then
+            echo "use-touchy-local: $checkout has local changes; commit or stash them first" >&2
+            exit 1
+        fi
+        git -C "$checkout" fetch --prune origin
+        git -C "$checkout" checkout main
+        git -C "$checkout" pull --ff-only
+    else
+        mkdir -p reference
+        git clone https://github.com/geeksville/touchy-pad.git "$checkout"
+    fi
+    # An editable install from a clone needs the protoc-generated bindings
+    # (app/src/touchy_pad/_proto/*_pb2.py), which upstream gitignores and only
+    # generates for releases. Build them with upstream's own recipe, feeding it a
+    # throwaway venv that has grpcio-tools (so voicebot's dependencies stay lean).
+    if [ ! -x "$proto_py" ]; then
+        python3 -m venv reference/.proto-venv
+    fi
+    if ! "$proto_py" -c 'import grpc_tools' >/dev/null 2>&1; then
+        "$proto_py" -m pip --quiet install grpcio-tools
+    fi
+    SYS_PYTHON="$proto_py" just --justfile "$checkout/Justfile" build-proto-py
+    poetry add --no-interaction --editable "$checkout/app"
     poetry install --no-interaction
 
 # Point the touchy-pad dependency back at the published PyPI package (the default).
 use-touchy-pypi:
     #!/usr/bin/env bash
     set -euo pipefail
-    poetry add --no-interaction "touchy-pad@>=0.3.8"
+    poetry add --no-interaction "touchy-pad@>=0.3.12"
     poetry install --no-interaction
 
 # List the models the remote server has pulled.

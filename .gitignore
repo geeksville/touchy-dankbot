@@ -6,3 +6,6 @@ __pycache__/
 .venv/
 dist/
 
+# Local checkouts of upstream projects (`just use-touchy-local`).
+reference/
+

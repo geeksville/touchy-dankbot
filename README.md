@@ -56,13 +56,12 @@ pip install touchy-voicebot          # or:  pipx install touchy-voicebot
 ```
 
 That pulls the [`touchy-pad`](https://pypi.org/project/touchy-pad/) host library
-(**>= 0.3.8**) from PyPI for the pad output. The LLM / STT half needs no
+(**>= 0.3.12**) from PyPI for the pad output. The LLM / STT half needs no
 touchy-pad at all — with no pad attached the display is simply a logged warning.
 The display relies on a recent touchy-pad host API
 (`SetPropertiesCmd` / `build_property_override` + inline-recolour labels, plus
-`scroll_speed_px_s` for the marquee speed); if the published version is older
-than 0.3.8, install the git `main` or build the host library and use
-[Dev](#dev)'s `just use-touchy-local`.
+`scroll_speed_px_s` for the marquee speed); if the published version is too old,
+run `just use-touchy-local`, which clones the git `main` (see [Dev](#dev)).
 
 You also need a reachable **Ollama** server — a local `ollama serve`, or a
 remote box over Tailscale / LAN. Point `--url` / `VOICEBOT_URL` at it. On first
@@ -281,8 +280,11 @@ just bump-version         # bump version, commit, tag, push (then release on Git
 The devcontainer (`.devcontainer/`) ships Python, Poetry, just, libusb (for the
 touchy-pad USB transport) and ALSA / PortAudio (for the mic) — open it in VS Code
 and `just test` works. By default the `touchy-pad` dependency is the **published
-PyPI package**; `just use-touchy-local` swaps in a sibling `../../app` checkout
-while hacking on the host library itself (`just use-touchy-pypi` puts it back).
+PyPI package**; `just use-touchy-local` clones (or fast-forwards)
+[upstream](https://github.com/geeksville/touchy-pad) into the git-ignored
+`reference/touchy-pad` and depends on that checkout's `app/` host library while
+hacking on touchy-pad itself (`just use-touchy-pypi` puts the published package
+back).
 
 Only [`src/voicebot/display.py`](src/voicebot/display.py) imports `touchy_pad`,
 and it does so lazily, so the rest of voicebot (and the whole test suite) runs

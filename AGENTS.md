@@ -63,8 +63,13 @@ just bump-version          # bump version, commit, tag, push
   `Label.recolor` arrived in 0.3.5; 0.3.8 added `Label.scroll_speed_px_s`, the
   marquee-speed knob `display.py` uses to slow the scroll to
   `DEFAULT_SCROLL_SPEED_PX_S`). Older releases break the display path and its
-  tests. Until a suitable version is on PyPI, resolve it with
-  `just use-touchy-local` (a path dep on the sibling `../../app` tree).
+  tests. To develop against upstream instead of PyPI, run
+  `just use-touchy-local`: it clones or fast-forwards
+  [geeksville/touchy-pad](https://github.com/geeksville/touchy-pad) into the
+  git-ignored `reference/touchy-pad`, generates the protobuf bindings upstream
+  keeps out of git (via a scratch venv with `grpcio-tools`), and path-depends on
+  that checkout's `app/` host library (`just use-touchy-pypi` restores the
+  published package).
 - **Keep `moonshine_voice` / `sounddevice` imports lazy** too (inside
   `AudioIn._build()` / `resolve_device()`), so importing `voicebot` never needs
   the native libs — and CI needs no mic.
