@@ -60,6 +60,15 @@ def test_the_three_lines_keep_their_plain_text():
     assert str(logs.reply_line((), "no runs")) == "REPLY: no runs"
 
 
+def test_the_playback_line_keeps_the_context_and_the_quip():
+    line = logs.playback_line("one", "the light is red", (Run("Danger", COLOURS["red"]),))
+    assert str(line) == "one · the light is red → REPLY: Danger"
+    assert line.spans[0].style == logs.DIM_STYLE
+    assert any(span.style == "#ff0000" for span in line.spans)
+    # A suppressed reply has no runs and says so instead of a quip.
+    assert str(logs.playback_line("one", "meh")) == "one · meh → SKIP(/notfunny)"
+
+
 def test_the_handler_prints_the_quip_in_its_display_colours(console):
     runs = (Run("Danger", COLOURS["red"]), Run(" ahead", COLOURS["blue"]))
     plain, ansi = _emit(console, lambda logger: logger.info(logs.reply_line(runs)))

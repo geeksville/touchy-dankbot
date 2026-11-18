@@ -6,7 +6,9 @@ Four commands:
   and print a witty reply for each (commands stripped; ``/notfunny`` suppresses).
 * ``voicebot models`` — list the models the server has pulled.
 * ``voicebot jokemark`` — the model bake-off: every model/params in a TOML
-  matrix against the packaged overheard corpus, rendered to Markdown.
+  matrix against the packaged overheard corpus, rendered to a Markdown report
+  plus a JSON sidecar; ``--playback FILE`` replays that JSON instead of
+  talking to the server.
 * ``voicebot listen`` — mic → Moonshine → gate → reply, scrolled on the pad.
 
 Config resolution is *flag → env → default*, implemented via click's
@@ -47,11 +49,15 @@ from .jokemark import (
     CORPUS_ASSET,
     MATRIX_ASSET,
     JokemarkError,
+    LineResult,
     ModelResult,
     ModelSpec,
     load_lines,
     load_matrix,
+    load_report,
     packaged_text,
+    playback,
+    render_json,
     render_markdown,
     run_benchmark,
 )
@@ -443,7 +449,14 @@ def models(url: str, native: bool, timeout: float) -> None:
     type=click.Path(dir_okay=False, path_type=Path),
     default=Path("jokemark.md"),
     show_default=True,
-    help="Markdown report to write.",
+    help="Markdown report to write (a .json sidecar goes next to it).",
+)
+@click.option(
+    "--playback",
+    "playback_file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Replay a jokemark JSON report instead of talking to the server.",
 )
 @click.option("--url", default=DEFAULT_URL, envvar="VOICEBOT_URL", show_default=True)
 @click.option(
@@ -500,6 +513,7 @@ def jokemark(
     models_file: Path | None,
     lines_file: Path | None,
     out: Path,
+    playback_file: Path | None,
     url: str,
     native: bool,
     timeout: float,
@@ -511,6 +525,9 @@ def jokemark(
     dry_run: bool,
 ) -> None:
     """Bake off the quip stage: every model/params against every overheard line."""
+    if playback_file is not None:  # replay a saved run — no server involved
+        _replay(playback_file, display_mode)
+        return
     if persona_file is not None:
         persona = persona_file.read()
     try:
@@ -531,6 +548,11 @@ def jokemark(
                 f"max_tokens {spec.max_tokens}, native {'on' if spec.native else 'off'})"
             )
         return
+
+    json_out = out.with_suffix(".json")
+    if json_out == out:
+        click.echo("voicebot: --out cannot end in .json — that is the sidecar", err=True)
+        raise SystemExit(1)
 
     logging.getLogger("voicebot").setLevel(logging.INFO)
     display = _optional_display(display_mode)  # None when no pad is attached
@@ -553,7 +575,7 @@ def jokemark(
         if display is not None:
             display.close()
 
-    report = render_markdown(
+    markdown = render_markdown(
         results,
         lines,
         url=url,
@@ -561,18 +583,69 @@ def jokemark(
         corpus_name=lines_file.name if lines_file is not None else CORPUS_ASSET,
         native=native,
     )
-    try:
-        out.write_text(report, encoding="utf-8")
-    except OSError as exc:
-        click.echo(f"voicebot: cannot write {out}: {exc}", err=True)
-        raise SystemExit(1) from exc
-    click.echo(f"wrote {out}")
+    payload = render_json(
+        results,
+        lines,
+        url=url,
+        persona=persona,
+        corpus_name=lines_file.name if lines_file is not None else CORPUS_ASSET,
+        native=native,
+    )
+    json_out = out.with_suffix(".json")
+    for path, content in ((out, markdown), (json_out, payload)):
+        try:
+            path.write_text(content, encoding="utf-8")
+        except OSError as exc:
+            click.echo(f"voicebot: cannot write {path}: {exc}", err=True)
+            raise SystemExit(1) from exc
+        click.echo(f"wrote {path}")
     if interrupted:  # pragma: no cover - interactive stop
         click.echo("voicebot: interrupted — partial report written.", err=True)
         raise SystemExit(130)
     if not any(row.reply is not None for model in results for row in model.results):
         click.echo("voicebot: no model produced a reply.", err=True)
         raise SystemExit(1)
+
+
+def _replay(path: Path, display_mode: str) -> None:
+    """Replay a saved jokemark JSON: log each quip and draw it on an attached pad.
+
+    No server, no model: the JSON already holds everything the run produced, so
+    the developer can re-watch a bake-off (or a favourite model's bank) on the
+    desk robot. Each drawn quip stays up for one second before the next.
+    """
+    try:
+        report = load_report(path.read_text(encoding="utf-8"))
+    except (OSError, JokemarkError) as exc:
+        click.echo(f"voicebot: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+    logging.getLogger("voicebot").setLevel(logging.INFO)
+    display = _optional_display(display_mode)  # None when no pad is attached
+    try:
+        replayed = playback(
+            report,
+            emit=_log_playback,
+            display=display.show if display is not None else None,
+        )
+    except KeyboardInterrupt:  # pragma: no cover - interactive stop
+        click.echo("voicebot: stopped.", err=True)
+        return
+    finally:
+        if display is not None:
+            display.close()
+    click.echo(f"replayed {replayed} replies from {path} (no model calls)")
+
+
+def _log_playback(spec: ModelSpec, row: LineResult) -> None:
+    """One playback entry to the log: the overheard line, then the quip (or skip)."""
+    reply = row.reply
+    if reply is None:
+        log.warning("%s · %s — %s", spec.label, row.line, row.error or "no reply recorded")
+    elif reply.skip:
+        log.info(logs.playback_line(spec.label, row.line))
+    else:
+        log.info(logs.playback_line(spec.label, row.line, reply.runs, reply.text))
 
 
 def _input_lines(line: str | None, file: TextIO | None) -> list[str]:

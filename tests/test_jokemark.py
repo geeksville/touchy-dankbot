@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from voicebot import jokemark
+from voicebot.commands import Run
 from voicebot.config import (
     DEFAULT_CTX,
     DEFAULT_MAX_TOKENS,
@@ -25,8 +26,12 @@ from voicebot.jokemark import (
     LineResult,
     ModelResult,
     ModelSpec,
+    Report,
     load_lines,
     load_matrix,
+    load_report,
+    playback,
+    render_json,
     render_markdown,
     run_benchmark,
 )
@@ -402,3 +407,200 @@ def test_render_notes_a_fresh_pull():
     md = _render(results, ("a",))
     assert "pulled just now" in md
     assert "| 1 | a | — | — | — |" in md
+
+
+# -- the JSON report ----------------------------------------------------------
+
+
+def _render_json(results, lines, *, native=False):
+    return render_json(
+        results,
+        lines,
+        url="http://ollama:11434",
+        persona="PERSONA\nsecond line",
+        corpus_name="overheard.txt",
+        native=native,
+        now=FIXED_NOW,
+    )
+
+
+def _coloured(text="quip", *, skip=False, raw=None, colour=0xFFFFFF):
+    return Reply(
+        source="line",
+        text=text,
+        skip=skip,
+        model="m",
+        runs=() if skip else (Run(text, colour),),
+        raw=text if raw is None else raw,
+    )
+
+
+def _run_with_every_outcome():
+    """One bank with a coloured reply, a /notfunny skip and a failed line."""
+    spec = ModelSpec(label="m1", model="org/model:latest", temperature=0.5)
+    return [
+        ModelResult(
+            spec=spec,
+            results=(
+                LineResult(
+                    "a|b",
+                    _coloured("Danger ahead", raw="/color/red Danger ahead", colour=0xFF0000),
+                    0.5,
+                ),
+                LineResult("c", _coloured("", skip=True, raw="/notfunny"), 0.25),
+                LineResult("d", None, 0.1, error="boom"),
+            ),
+            pulled=True,
+        )
+    ]
+
+
+def test_render_json_keeps_the_same_run_machine_readable():
+    long_raw = "/color/red " + "x" * 400
+    results = _run_with_every_outcome()
+    results[0] = ModelResult(
+        spec=results[0].spec,
+        results=(
+            LineResult("a|b", _coloured("Danger ahead", raw=long_raw, colour=0xFF0000), 0.5),
+            *results[0].results[1:],
+        ),
+        pulled=True,
+    )
+    data = json.loads(_render_json(results, ("a|b", "c", "d"), native=True))
+
+    assert data["version"] == jokemark.REPORT_VERSION
+    assert data["generated"] == "2026-11-17T21:04:00+00:00"
+    assert data["url"] == "http://ollama:11434"
+    assert data["native"] is True
+    assert data["persona"]["snippet"] == "PERSONA"
+    assert data["persona"]["text"] == "PERSONA\nsecond line"
+    assert data["corpus"] == {"name": "overheard.txt", "lines": ["a|b", "c", "d"]}
+
+    (model,) = data["models"]
+    assert model["label"] == "m1"
+    assert model["model"] == "org/model:latest"
+    assert model["temperature"] == 0.5
+    assert model["pulled"] is True
+    reply, skip, failed = model["results"]
+    assert (reply["line"], reply["reply"], reply["skip"]) == ("a|b", "Danger ahead", False)
+    assert reply["raw"] == long_raw  # untruncated, unlike the Markdown table
+    assert reply["runs"] == [{"text": "Danger ahead", "colour": 0xFF0000}]
+    assert reply["elapsed_s"] == 0.5
+    assert (skip["reply"], skip["skip"], skip["raw"]) == ("", True, "/notfunny")
+    assert (failed["reply"], failed["error"]) == (None, "boom")
+
+
+def test_a_report_round_trips_through_load_report():
+    original = _run_with_every_outcome()
+    report = load_report(_render_json(original, ("a|b", "c", "d")))
+
+    assert report.lines == ("a|b", "c", "d")
+    assert report.url == "http://ollama:11434"
+    assert report.corpus_name == "overheard.txt"
+    assert report.persona == "PERSONA\nsecond line"
+    assert report.native is False
+    assert report.generated == "2026-11-17T21:04:00+00:00"
+
+    (model,) = report.models
+    assert model.spec == original[0].spec
+    assert model.pulled is True
+    reply, skip, failed = model.results
+    assert reply.line == "a|b"
+    assert reply.reply.text == "Danger ahead"
+    assert reply.reply.runs == (Run("Danger ahead", 0xFF0000),)
+    assert reply.reply.raw == "/color/red Danger ahead"
+    assert skip.reply.skip is True and skip.reply.text == ""
+    assert failed.reply is None and failed.error == "boom"
+
+
+def test_a_report_without_runs_keeps_the_text_visible():
+    payload = {
+        "version": jokemark.REPORT_VERSION,
+        "models": [{"label": "m", "model": "m", "results": [{"line": "a", "reply": "hi"}]}],
+        "corpus": {"lines": ["a"]},
+        "persona": "P",
+    }
+    (model,) = load_report(json.dumps(payload)).models
+    assert model.results[0].reply.runs == (Run("hi"),)
+
+
+@pytest.mark.parametrize(
+    ("payload", "match"),
+    [
+        ("not json", "not valid JSON"),
+        (json.dumps([]), "JSON object"),
+        (
+            json.dumps({"version": 2, "models": [{"model": "m"}], "corpus": {"lines": []}}),
+            "version",
+        ),
+        (json.dumps({"version": 1, "models": [], "corpus": {"lines": []}}), "non-empty"),
+        (json.dumps({"version": 1, "models": [{"model": "m"}], "corpus": {}}), "corpus.lines"),
+        (
+            json.dumps(
+                {
+                    "version": 1,
+                    "models": [{"model": "m"}],
+                    "corpus": {"lines": ["a"]},
+                    "persona": 3,
+                }
+            ),
+            "persona",
+        ),
+    ],
+)
+def test_load_report_rejects_a_malformed_file(payload, match):
+    with pytest.raises(JokemarkError, match=match):
+        load_report(payload)
+
+
+# -- playback -----------------------------------------------------------------
+
+
+def _playback_report() -> Report:
+    """A saved run with a reply, a skip, a second reply and an error row."""
+    return Report(
+        models=(
+            ModelResult(
+                spec=ModelSpec(label="m1", model="m"),
+                results=(
+                    LineResult("a", _coloured("Danger ahead"), 0.4),
+                    LineResult("b", _coloured("", skip=True, raw="/notfunny"), 0.2),
+                    LineResult("c", _coloured("quiet"), 0.3),
+                    LineResult("d", None, 0.1, error="boom"),
+                ),
+            ),
+        ),
+        lines=("a", "b", "c", "d"),
+        url="http://ollama:11434",
+        corpus_name="overheard.txt",
+        persona="P",
+    )
+
+
+def test_playback_draws_each_reply_and_pauses_only_when_it_drew():
+    shown: list[list[str]] = []
+    pauses: list[float] = []
+    entries: list[tuple[str, str]] = []
+
+    def display(runs):
+        shown.append([run.text for run in runs])
+        return len(shown) == 1  # the pad has gone away by the second quip
+
+    replayed = playback(
+        _playback_report(),
+        emit=lambda spec, row: entries.append((spec.label, row.line)),
+        display=display,
+        sleep=pauses.append,
+    )
+
+    assert replayed == 2  # the skip and the error are not replies
+    assert entries == [("m1", "a"), ("m1", "b"), ("m1", "c"), ("m1", "d")]
+    assert shown == [["Danger ahead"], ["quiet"]]
+    assert pauses == [jokemark.PLAYBACK_PAUSE_S]  # only the draw that landed
+
+
+def test_playback_without_a_pad_pauses_nothing():
+    pauses: list[float] = []
+    replayed = playback(_playback_report(), sleep=pauses.append)
+    assert replayed == 2
+    assert pauses == []

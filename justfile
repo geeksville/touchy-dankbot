@@ -58,9 +58,11 @@ models *args: install
     poetry run voicebot models {{args}}
 
 # Bake off the quip stage: every model/params in the packaged matrix against the
-# packaged overheard corpus, writing a Markdown report (default jokemark.md).
+# packaged overheard corpus, writing a Markdown report plus a JSON sidecar
+# (default jokemark.md + jokemark.json).
 # Examples: `just jokemark`; `just jokemark -- --dry-run`;
-#           `just jokemark -- --models mine.json -o report.md`
+#           `just jokemark -- --models mine.toml -o report.md`;
+#           `just jokemark -- --playback jokemark.json` (no server; pad optional)
 jokemark *args: install
     poetry run voicebot jokemark {{args}}
 

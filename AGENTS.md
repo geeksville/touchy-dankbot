@@ -18,7 +18,7 @@ of the **creep3r** art project. This repo is standalone: it depends on the
 | `src/voicebot/cli.py` | `click` CLI: `reply` / `models` / `jokemark` / `listen` (`listen` always scrolls on the pad). |
 | `src/voicebot/server.py` | `ChatClient` (OpenAI `/v1` + native `/api/chat`, plus `has_model` / `pull_model`) + `VoicebotError`. |
 | `src/voicebot/responder.py` | Persona → prompt → reply, and the reply value object. |
-| `src/voicebot/jokemark.py` | The model bake-off: matrix/corpus loaders, run loop, Markdown report, optional pad echo. |
+| `src/voicebot/jokemark.py` | The model bake-off: matrix/corpus loaders, run loop, Markdown + JSON reports, playback (no-server replay), optional pad echo. |
 | `src/voicebot/persona.py` | The default persona (the toaster robot). |
 | `src/voicebot/commands.py` | The `/command` channel (`/notfunny`, `/color/NAME`). |
 | `src/voicebot/audio.py` | Mic capture + Moonshine STT (the audio-in stage). |
@@ -46,7 +46,8 @@ just lint                  # ruff format + check
 just build                 # wheel + sdist into dist/
 just reply -- --line "..."  # run the CLI in the venv
 just listen -- --fake sim-overheard.txt
-just jokemark              # model bake-off → jokemark.md (needs the server)
+just jokemark              # model bake-off → jokemark.md + jokemark.json (needs the server)
+just jokemark -- --playback jokemark.json   # replay a saved run (no server, optional pad)
 just bump-version          # bump version, commit, tag, push
 ```
 

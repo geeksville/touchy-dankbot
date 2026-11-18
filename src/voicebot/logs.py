@@ -86,6 +86,24 @@ def reply_line(runs: Sequence[Run], text: str = "") -> Text:
     return line
 
 
+def playback_line(
+    label: str, heard: str, runs: Sequence[Run] | None = None, text: str = ""
+) -> Text:
+    """``<label> · <heard> → REPLY: <quip>`` — one ``jokemark --playback`` entry.
+
+    The context is dim so the quip stands out in its display colours. *runs* is
+    ``None`` for a reply the model suppressed, which then reads
+    ``SKIP(/notfunny)`` instead of a quip.
+    """
+    line = Text()
+    line.append(f"{label} · {heard} → ", style=DIM_STYLE)
+    if runs is None:
+        line.append("SKIP(/notfunny)", style=SKIP_STYLE)
+    else:
+        line.append_text(reply_line(runs, text))
+    return line
+
+
 class _Handler(RichHandler):
     """A ``RichHandler`` that lets a :class:`~rich.text.Text` message keep its colour.
 

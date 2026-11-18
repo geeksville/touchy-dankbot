@@ -91,8 +91,11 @@ voicebot listen
 # Replay a file instead — no mic, no model (the pad still gets the quips):
 voicebot listen --fake sim-overheard.txt
 
-# Bake off models: packaged corpus × model matrix → jokemark.md
+# Bake off models: packaged corpus × model matrix → jokemark.md + jokemark.json
 voicebot jokemark
+
+# Replay a saved bake-off: no server, no model — log + pad, 1 s per quip
+voicebot jokemark --playback jokemark.json
 ```
 
 ## Commands
@@ -101,7 +104,7 @@ voicebot jokemark
 |---|---|
 | `voicebot reply` | Read overheard lines (`--line` / `-f FILE` / stdin) and print a witty reply for each (`--json` for `{input, reply, skip, model, raw}` per line). Commands are stripped from the printed text, so a `/notfunny` reply prints nothing. |
 | `voicebot models` | List the models the server has pulled. |
-| `voicebot jokemark` | Bake off the quip stage: every model/params in a TOML matrix against the packaged overheard corpus (fetching missing models), writing a Markdown report (default `jokemark.md`). `--dry-run` shows the matrix without touching the network. If a touchy-pad is attached, each reply is also drawn on it as it is produced (entirely optional). |
+| `voicebot jokemark` | Bake off the quip stage: every model/params in a TOML matrix against the packaged overheard corpus (fetching missing models), writing a Markdown report and a JSON sidecar (default `jokemark.md` + `jokemark.json`). `--dry-run` shows the matrix without touching the network. If a touchy-pad is attached, each reply is also drawn on it as it is produced (entirely optional). `--playback FILE` replays a saved JSON report instead — no server, no model: entries are logged, quips shown on an attached pad, one second each. |
 | `voicebot listen` | Listen to the mic, transcribe with **Moonshine**, log `HEARD:` / `SKIP(...)` / `REPLY:` per utterance, and scroll each quip on an attached touchy-pad; `--fake FILE` replays a text file instead (no mic, no model). |
 
 Configuration is **flag -> env -> default** — click implements the precedence:
@@ -131,6 +134,7 @@ time:
 just jokemark                    # or: voicebot jokemark
 voicebot jokemark --dry-run      # print the resolved matrix + line count
 voicebot jokemark --models mine.toml -o report.md --no-pull
+voicebot jokemark --playback jokemark.json   # replay a saved run (no server)
 ```
 
 * **Corpus:** `src/voicebot/assets/overheard.txt` — the six
@@ -149,10 +153,15 @@ voicebot jokemark --models mine.toml -o report.md --no-pull
   `voicebot listen` scrolls. A missing pad is ignored (one warning, no
   per-reply probing), so the bake-off never waits for hardware;
   `--display-mode` picks the layout.
-* **Report:** one Markdown file with a summary table (replies / skips / errors /
+* **Reports:** one Markdown file with a summary table (replies / skips / errors /
   median / slowest) and, per model, every line with the quip it produced, the
-  raw output (commands visible) and the latency. `jokemark.md` is a generated
-  artifact and is gitignored.
+  raw output (commands visible) and the latency — plus a JSON sidecar
+  (`<out>.json`, `jokemark.json` by default) with the same data, untruncated
+  and including the colour runs. Both are generated artifacts.
+* **Playback:** `--playback jokemark.json` replays that sidecar without a
+  server or a model — every entry is logged (`label · overheard → REPLY: …`,
+  in the quip's display colours) and each non-skip quip is drawn on an attached
+  touchy-pad, pausing one second so it can be read.
 
 The first six corpus lines are the old manual-testing file, so the bake-off
 keeps covering everything `voicebot reply -f sim-overheard.txt` used to.

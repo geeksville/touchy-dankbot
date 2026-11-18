@@ -33,8 +33,9 @@ from .commands import Run
 log = logging.getLogger(__name__)
 
 #: A display sink: handed one quip's colour runs (``Reply.runs``).
-#: :meth:`PadDisplay.show` is the real one; ``None`` in a loop means "show nothing".
-DisplaySink = Callable[[tuple[Run, ...]], None]
+#: :meth:`PadDisplay.show` is the real one — it answers ``False`` when nothing was
+#: drawn; ``None`` in a loop means "show nothing".
+DisplaySink = Callable[[tuple[Run, ...]], bool | None]
 
 #: On-device screen + widget names — the contract between the saved screen and
 #: the runtime property overrides. Deliberately *not* ``default`` so a later
@@ -265,7 +266,9 @@ class PadDisplay:
         refusal here means the link itself is broken rather than a bad payload.
         """
         try:
-            self._write(pad, to_markup(runs))
+            lvgl = to_markup(runs)
+            log.debug("voicebot: rendering quip: %s", lvgl)
+            self._write(pad, lvgl)
             return True
         except Exception as exc:  # noqa: BLE001 — a lost pad is not fatal
             log.warning("voicebot: lost the touchy-pad (%s) — will reconnect", exc)

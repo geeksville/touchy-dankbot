@@ -380,3 +380,126 @@ def test_jokemark_still_runs_when_no_pad_is_attached(monkeypatch, tmp_path):
     assert display.started and display.closed
     assert display.shown == []  # nothing was ever sent to a pad
     assert out.exists()
+
+
+def _bake(monkeypatch, tmp_path, replies):
+    """Run one model over *replies*' keys and return the JSON sidecar path."""
+    _use_fake(monkeypatch, replies)
+    matrix = _matrix(tmp_path / "models.toml", [{"model": "m1", "label": "one"}])
+    corpus = _corpus(tmp_path / "overheard.txt", list(replies))
+    result = CliRunner().invoke(
+        cli.main,
+        [
+            "jokemark",
+            "--models",
+            str(matrix),
+            "-f",
+            str(corpus),
+            "-o",
+            str(tmp_path / "report.md"),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    return tmp_path / "report.json"
+
+
+def test_jokemark_writes_a_json_sidecar_next_to_the_report(monkeypatch, tmp_path):
+    sidecar = _bake(monkeypatch, tmp_path, {"hello there": "hi", "bye now": "/notfunny"})
+    assert sidecar.exists()
+    data = json.loads(sidecar.read_text(encoding="utf-8"))
+    assert data["corpus"]["lines"] == ["hello there", "bye now"]
+    (model,) = data["models"]
+    assert model["label"] == "one"
+    assert [(row["reply"], row["skip"]) for row in model["results"]] == [
+        ("hi", False),
+        ("", True),
+    ]
+
+
+def test_jokemark_refuses_to_overwrite_the_sidecar_with_the_report(monkeypatch, tmp_path):
+    _use_fake(monkeypatch)
+    matrix = _matrix(tmp_path / "models.toml", [{"model": "m1", "label": "one"}])
+    corpus = _corpus(tmp_path / "overheard.txt", ["hello there"])
+    result = CliRunner().invoke(
+        cli.main,
+        [
+            "jokemark",
+            "--models",
+            str(matrix),
+            "-f",
+            str(corpus),
+            "-o",
+            str(tmp_path / "report.json"),
+        ],
+    )
+    assert result.exit_code == 1
+    assert "sidecar" in _all_output(result)
+
+
+def test_jokemark_playback_replays_without_the_llm(monkeypatch, tmp_path, caplog):
+    import logging
+
+    from voicebot.jokemark import PLAYBACK_PAUSE_S
+
+    sidecar = _bake(monkeypatch, tmp_path, {"hello there": "/color/red hi", "bye now": "/notfunny"})
+
+    class NoClient:
+        """A ChatClient that must never be constructed by playback."""
+
+        def __init__(self, settings):
+            raise AssertionError("playback must not talk to the LLM")
+
+    monkeypatch.setattr(cli, "ChatClient", NoClient)
+    FakeDisplay.instances = []
+    pauses: list[float] = []
+    monkeypatch.setattr("voicebot.jokemark.time.sleep", pauses.append)
+
+    with caplog.at_level(logging.INFO, logger="voicebot.cli"):
+        result = CliRunner().invoke(cli.main, ["jokemark", "--playback", str(sidecar)])
+
+    assert result.exit_code == 0
+    assert "replayed 1 replies" in result.output
+    assert "no model calls" in result.output
+    display = FakeDisplay.instances[0]
+    assert display.started and display.closed
+    assert [[run.text for run in runs] for runs in display.shown] == [["hi"]]
+    assert display.shown[0][0].colour == 0xFF0000  # the saved /color/red run
+    assert pauses == [PLAYBACK_PAUSE_S]
+    assert "REPLY: hi" in caplog.text
+    assert "SKIP(/notfunny)" in caplog.text
+    assert "hello there" in caplog.text
+
+
+def test_jokemark_playback_without_a_pad_does_not_pause(monkeypatch, tmp_path):
+    sidecar = _bake(monkeypatch, tmp_path, {"hello there": "hi"})
+
+    class NoPadDisplay(FakeDisplay):
+        """A display whose one-off probe finds no touchy-pad."""
+
+        def start(self):
+            self.started = True
+            return False
+
+    monkeypatch.setattr(cli, "PadDisplay", NoPadDisplay)
+    FakeDisplay.instances = []  # forget the bake's display; keep only playback's
+    pauses: list[float] = []
+    monkeypatch.setattr("voicebot.jokemark.time.sleep", pauses.append)
+
+    result = CliRunner().invoke(cli.main, ["jokemark", "--playback", str(sidecar)])
+
+    assert result.exit_code == 0
+    assert "replayed 1 replies" in result.output
+    assert NoPadDisplay.instances[0].shown == []
+    assert pauses == []  # the log needs no reading time
+
+
+def test_jokemark_playback_rejects_a_bad_report(monkeypatch, tmp_path):
+    _use_fake(monkeypatch)
+    bad = tmp_path / "bad.json"
+    bad.write_text("not json", encoding="utf-8")
+
+    result = CliRunner().invoke(cli.main, ["jokemark", "--playback", str(bad)])
+
+    assert result.exit_code == 1
+    assert "not valid JSON" in _all_output(result)
+    assert FakeDisplay.instances == []  # the file failed before the pad was probed

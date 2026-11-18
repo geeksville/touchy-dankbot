@@ -63,14 +63,25 @@ the bake-off never needs one.
 >   bake-off, and Q4_K_M keeps it Pi-sized). Hermes-3 8B stays in the matrix as
 >   the disciplined baseline and Human-Like Nemo Q8_0 as the 12B runner-up; the
 >   packaged matrix is asserted to contain the default.
+> * **JSON sidecar + playback (2026-11-17)** — every run now also writes
+>   `<out>.json` beside the Markdown (`jokemark.json` by default): the same
+>   data, versioned, with replies *untruncated* and their colour runs included
+>   (`render_json` / `load_report`). `voicebot jokemark --playback FILE` replays
+>   a report — no server, no model: each entry is logged (`label · overheard →
+>   REPLY: …` in its display colours, `SKIP(/notfunny)` for declines) and every
+>   non-skip reply is drawn on an attached pad, one second apart
+>   (`PLAYBACK_PAUSE_S`) so the developer can read it. Nothing is paused when no
+>   pad actually drew, and a malformed report exits 1 before the pad is probed.
 >
-> `just lint` clean; `just test` **161 passed / 2 skipped**. Live checks
-> (2026-11-17): `/api/pull` accepted `"model"` and returned
-> `{"status":"success"}` on the 0.40.14 server, and a one-model × 2-line run
-> produced a correct report (1 reply, 1 `/notfunny` skip, 0 errors) — the run
-> also surfaced a model emitting `/meer…`, which the responder strips as an
-> unknown command, exactly the sort of thing the bake-off exists to show. A
-> full 4-entry × 36-line baseline run (P5) remains a manual step.
+> `just lint` clean; `just test` **207 passed / 2 skipped** (161 before the
+> JSON-sidecar/playback pass). Live checks (2026-11-17): `/api/pull` accepted
+> `"model"` and returned `{"status":"success"}` on the 0.40.14 server, and a
+> one-model × 2-line run produced a correct report (1 reply, 1 `/notfunny`
+> skip, 0 errors) — the run also surfaced a model emitting `/meer…`, which the
+> responder strips as an unknown command, exactly the sort of thing the
+> bake-off exists to show. A `--playback` smoke of a hand-built report replayed
+> on the attached 480×272 panel (one reply, one skip, one 1 s pause) with no
+> server. A full 4-entry × 36-line baseline run (P5) remains a manual step.
 >
 > **Implementation notes.** The summary's `errors` counts every line without a
 > reply (failed cell + never-attempted rows); raw newlines render as `<br>`;
@@ -133,7 +144,8 @@ voicebot jokemark [OPTIONS]
 
   --models FILE        TOML matrix (default: packaged jokemark-models.toml)
   -f, --lines FILE     overheard corpus (default: packaged overheard.txt)
-  -o, --out FILE       Markdown report (default: ./jokemark.md)
+  -o, --out FILE       Markdown report (default: ./jokemark.md); <out>.json is its sidecar
+  --playback FILE      replay a saved <out>.json (no server) to the log and pad
   --url URL            Ollama server (default: $VOICEBOT_URL / DEFAULT_URL)
   --native             talk to /api/chat instead of /v1 (matrix may override)
   --timeout S          per-request chat timeout (default: DEFAULT_TIMEOUT)
@@ -153,8 +165,12 @@ Rationale:
   missing model becomes a recorded error instead of a multi-gigabyte download.
 * **`--out`** defaults to a fixed name so a run is easy to find and re-run;
   the path is echoed on stdout when the report is written.
-* No `--json` yet: Markdown is the deliverable. A machine-readable result JSON
-  is a natural follow-up once there is a consumer (see *Deferred*).
+* **JSON sidecar** — every run writes one beside the Markdown (`<out>.json`),
+  so a later consumer needs no second run; it is untruncated where the
+  Markdown cells cap raw output at ~300 chars.
+* **`--playback`** — replays that sidecar to the log and an optional pad instead
+  of talking to the server: one second per drawn quip, no pause when no pad
+  answers (the log needs no reading time).
 
 Exit status: **0** when at least one model produced a reply (per-model errors
 are data, not a crash); **1** when the matrix/corpus cannot be loaded, or no
@@ -375,8 +391,8 @@ min_p 0.05, ctx 4096, max_tokens 120, native off
   visible while judging). A skip renders as `— *(/notfunny)*`, never blank, so
   the reader can tell “model declined” from “cell missing”.
 * Cell escaping: `|` → `\|`, newlines → `<br>`, backticks wrapped around raw
-  output; long raw text is truncated at ~300 chars with `…` (full text stays in
-  the in-memory result; see *Deferred* for a JSON sidecar).
+  output; long raw text is truncated at ~300 chars with `…` (the full text is
+  in the `<out>.json` sidecar).
 * A failed bank renders an `**Error:** …` block under its heading and `—` cells;
   the summary's `errors` column counts that bank's failed cells.
 * Numbers are stable `#` indexes shared by the summary and every section, so the
@@ -384,22 +400,29 @@ min_p 0.05, ctx 4096, max_tokens 120, native off
 * Timestamps are UTC ISO-ish (`YYYY-MM-DD HH:MM UTC`), so a report is
   self-describing when attached to an issue.
 
+The JSON sidecar (`jokemark.json` by default) mirrors those tables without the
+truncation: a versioned header (`url`, `corpus`, `persona`, `native`,
+`generated`) and one object per model with one per line — `reply`, `skip`,
+`raw`, the `runs` (text + `0xRRGGBB` colour) and `elapsed_s`. It is what
+`--playback` reads; hand-editing it is supported but validated strictly.
+
 ## File & component layout
 
 | File | Change |
 |---|---|
 | `src/voicebot/assets/overheard.txt` | **new** — 6 old lines + ~30 restaurant/dinner-party lines. |
 | `src/voicebot/assets/jokemark-models.toml` | **new** — the matrix above. |
-| `src/voicebot/jokemark.py` | **new** — `ModelSpec`, `load_matrix`, `load_lines`, `run_benchmark`, `render_markdown`. Pure, network-free, no click. |
+| `src/voicebot/jokemark.py` | **new** — `ModelSpec`, `load_matrix`, `load_lines`, `run_benchmark`, `render_markdown`, plus the JSON sidecar (`render_json` / `load_report`) and `playback`. Pure, network-free, no click. |
 | `src/voicebot/server.py` | add `has_model` + `pull_model` (+ the pull timeout argument). |
 | `src/voicebot/config.py` | add `DEFAULT_PULL_TIMEOUT`. |
-| `src/voicebot/cli.py` | add the `jokemark` command (thin: options → `load_*` / `run_benchmark` → `render_markdown` → write the file); document it in the module docstring. |
+| `src/voicebot/cli.py` | add the `jokemark` command (thin: options → `load_*` / `run_benchmark` → `render_markdown` + `render_json` → write both files; `--playback` → `load_report` → `playback`); document it in the module docstring. |
+| `src/voicebot/logs.py` | `playback_line`: the dim `label · overheard →` prefix plus the quip in its display colours. |
 | `pyproject.toml` | explicit `include` for `src/voicebot/assets`. |
 | `justfile` | `jokemark *args: install` → `poetry run voicebot jokemark {{args}}`; comment the manual workflow it replaces. |
 | `README.md` | a “Model bake-off” subsection; demote `reply -f sim-overheard.txt` to a smoke example. |
 | `AGENTS.md` | one row in the repo-layout table for `jokemark.py` + the assets dir. |
-| `tests/test_jokemark.py` | **new** — loaders, runner, renderer, packaged-asset invariants. |
-| `tests/test_cli.py` | `jokemark` CLI cases (fake client, tmp files). |
+| `tests/test_jokemark.py` | **new** — loaders, runner, Markdown + JSON renderers, `load_report` validation, playback (pad + pause), packaged-asset invariants. |
+| `tests/test_cli.py` | `jokemark` CLI cases (fake client, tmp files), the JSON sidecar and `--playback` (no client, fake pad). |
 | `tests/test_server.py` | **new, small** — `has_model` / `pull_model` payload + error normalisation (monkeypatched `requests`/`OpenAI`). |
 
 The split mirrors the existing conventions: `cli.py` stays the only click
@@ -502,14 +525,15 @@ next default model without consulting shell history.
 | Initial entries | Hermes-3 8B + Human-Like Nemo 12B, each at the default sampler and one temperature variant | Exactly what has been evaluated by hand, plus an A/B that exercises the parameter axis. |
 | Pull default | on, `stream: false`, 1 h timeout | “fetch if needed” is the request; a cold 13 GB fetch must not hit the 120 s chat timeout. |
 | Failure policy | abort the failing model's bank, continue the run | Keeps a down server / bad model from costing 36 timeouts, without losing the other models. |
-| Output | one Markdown file, fixed default name | Directly readable/diffable and attachable; no presentation layer in the CLI beyond writing it. |
+| Output | one Markdown file + a JSON sidecar, fixed default names | The Markdown is directly readable/diffable and attachable; the sidecar is the same data for machines and the input to `--playback`. |
+| Playback | `--playback FILE`, log + optional pad, 1 s per drawn quip | Re-watching a saved run (on the actual display) is the point; the pause only happens when a pad drew, so a machine without one is not slowed down. |
 | Sampling | one sample per line, no seed | It is a vibe check (“jokemark”), not a statistically rigorous benchmark; repeats are deferred. |
 | Dependencies | none new — stdlib `tomllib` / `importlib.resources` / `dataclasses` / `hashlib` + existing `click` / `requests` / `openai` | Keeps the Pi install and the wheel small; `requests` already backs the native `/api/chat` path. |
 
 ## Deferred (explicitly not in this pass)
 
-* **JSON sidecar / `--json`** with the full untruncated replies, for later
-  score-keeping or plotting.
+* **Scoring/plotting on top of `jokemark.json`** — the data is there now; no
+  consumer beyond `--playback` yet.
 * **`repeats` / `seed`** per matrix entry (variance and determinism runs).
 * **Streaming pull progress** (Ollama `/api/pull` with `"stream": true`).
 * **Concurrent models** — pointless on a single-GPU/CPU Ollama box.
