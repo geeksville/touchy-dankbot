@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 
 from dankbot.config import DEFAULT_PULL_TIMEOUT, Settings
@@ -89,3 +91,42 @@ def test_has_model_surfaces_server_failures(monkeypatch):
     monkeypatch.setattr(client, "list_models", boom)
     with pytest.raises(DankbotError, match="down"):
         client.has_model("a")
+
+
+def test_ensure_model_fetches_only_a_model_the_server_lacks(monkeypatch, caplog):
+    client = ChatClient(Settings(url="http://ollama:11434"))
+    monkeypatch.setattr(client, "list_models", lambda: ["a:latest"])
+    pulled: list[str] = []
+    monkeypatch.setattr(client, "pull_model", pulled.append)
+    with caplog.at_level(logging.WARNING, logger="dankbot.server"):
+        assert client.ensure_model("a") is False  # already pulled
+        assert client.ensure_model("b") is True
+    assert pulled == ["b"]
+    # The fetch blocks for minutes, so it says so before it starts.
+    assert "model b is not on http://ollama:11434" in caplog.text
+
+
+def test_ensure_model_does_not_pull_when_the_server_cannot_be_asked(monkeypatch):
+    """A down (or non-Ollama) server must not turn into a failed startup."""
+    client = ChatClient(Settings())
+
+    def boom():
+        raise DankbotError("down")
+
+    monkeypatch.setattr(client, "list_models", boom)
+    monkeypatch.setattr(client, "pull_model", lambda name: pytest.fail("must not pull"))
+    assert client.ensure_model("a") is False
+
+
+def test_ensure_model_survives_a_failed_fetch(monkeypatch, caplog):
+    """A pull that fails is logged, not raised: the chat call reports it."""
+    client = ChatClient(Settings())
+    monkeypatch.setattr(client, "list_models", list)
+
+    def boom(name):
+        raise DankbotError("no such model")
+
+    monkeypatch.setattr(client, "pull_model", boom)
+    with caplog.at_level(logging.WARNING, logger="dankbot.server"):
+        assert client.ensure_model("a") is False
+    assert "could not fetch a: no such model" in caplog.text

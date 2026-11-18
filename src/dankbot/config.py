@@ -14,8 +14,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-#: The remote Ollama server (Tailscale; verified 2026-11-04, Ollama 0.40.14).
-DEFAULT_URL = "https://kai.pygmy-map.ts.net"
+#: The Ollama server: the *local* one, i.e. `ollama serve` on the same box
+#: (verified 2026-11-18, Ollama 0.40.15). The original remote box — the
+#: Tailscale host ``https://kai.pygmy-map.ts.net``, verified 2026-11-04 — still
+#: works; point ``--url`` / ``DANKBOT_URL`` at it to use it instead.
+DEFAULT_URL = "http://localhost:11434"
 
 #: Model default. Rocinante-X 12B (Q4_K_M) is the current pick after the
 #: jokemark bake-off: the funniest of the batch and small enough (Q4_K_M) for
@@ -39,6 +42,13 @@ DEFAULT_TIMEOUT = 120.0
 #: than a chat request: pulling the 12B Q8_0 GGUF is ~13 GB, minutes over a home
 #: uplink, not seconds.
 DEFAULT_PULL_TIMEOUT = 3600.0
+
+#: Fetch a model the server does not have yet? ``reply`` / ``listen`` ask what
+#: the server has at startup and pull the model when it is missing, so a fresh
+#: box works on the first quip instead of failing with a 404. A multi-GB
+#: download is a surprise, hence the escape hatch (``--no-pull`` /
+#: ``DANKBOT_PULL=0``). jokemark has the same flag for the same reason.
+DEFAULT_PULL = True
 
 
 @dataclass(frozen=True)

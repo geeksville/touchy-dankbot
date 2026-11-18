@@ -3,7 +3,8 @@
 `CLAUDE.md` is a symlink to this file — keep them in sync via the symlink.
 
 `dankbot` is an eavesdropping desk robot: it listens to nearby conversation,
-asks a small LLM (a remote [Ollama] server) for a witty one-liner, and scrolls
+asks a small LLM (a local [Ollama] server — the remote box is opt-in via
+`--url` / `DANKBOT_URL`) for a witty one-liner, and scrolls
 that line across an addressable-LED matrix (a [touchy-pad]). It is the AI half
 of the **creep3r** art project. This repo is standalone: it depends on the
 *published* `touchy-pad` package, not the touchy-pad source tree.
@@ -16,7 +17,7 @@ of the **creep3r** art project. This repo is standalone: it depends on the
 | Path | Purpose |
 |------|---------|
 | `src/dankbot/cli.py` | `click` CLI: `reply` / `models` / `jokemark` / `listen` (`listen` always scrolls on the pad). |
-| `src/dankbot/server.py` | `ChatClient` (OpenAI `/v1` + native `/api/chat`, plus `has_model` / `pull_model`) + `DankbotError`. |
+| `src/dankbot/server.py` | `ChatClient` (OpenAI `/v1` + native `/api/chat`, plus `has_model` / `pull_model` / `ensure_model`) + `DankbotError`. |
 | `src/dankbot/responder.py` | Persona → prompt → reply, and the reply value object. |
 | `src/dankbot/jokemark.py` | The model bake-off: matrix/corpus loaders, run loop, Markdown + JSON reports, playback (no-server replay), optional pad echo. |
 | `src/dankbot/persona.py` | The default persona (the toaster robot). |

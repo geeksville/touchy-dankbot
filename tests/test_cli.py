@@ -31,6 +31,12 @@ class FakeClient:
     def has_model(self, name):
         return FakeClient.available is None or name in FakeClient.available
 
+    def ensure_model(self, name):
+        if self.has_model(name):
+            return False
+        self.pull_model(name)
+        return True
+
     def pull_model(self, name):
         FakeClient.pulled.append(name)
 
@@ -116,6 +122,49 @@ def test_reply_reads_stdin(monkeypatch):
     _use_fake(monkeypatch, {"a": "quip a"})
     result = CliRunner().invoke(cli.main, ["reply"], input="a\n")
     assert result.output.splitlines() == ["quip a"]
+
+
+def test_reply_fetches_a_model_the_server_does_not_have(monkeypatch):
+    """A fresh box pulls the model at startup instead of 404ing on the first quip."""
+    _use_fake(monkeypatch, {"the bread is done baking": "Time to toast!"})
+    FakeClient.available = set()
+    result = CliRunner().invoke(cli.main, ["reply", "--line", "the bread is done baking"])
+    assert result.exit_code == 0
+    assert result.output.strip() == "Time to toast!"
+    assert FakeClient.pulled == [cli.DEFAULT_MODEL]
+
+
+def test_reply_does_not_fetch_a_model_the_server_already_has(monkeypatch):
+    _use_fake(monkeypatch, {"a": "quip a"})
+    FakeClient.available = {cli.DEFAULT_MODEL}
+    CliRunner().invoke(cli.main, ["reply", "--line", "a"])
+    assert FakeClient.pulled == []
+
+
+def test_reply_no_pull_leaves_the_model_to_the_server(monkeypatch):
+    _use_fake(monkeypatch, {"a": "quip a"})
+    FakeClient.available = set()
+    result = CliRunner().invoke(cli.main, ["reply", "--line", "a", "--no-pull"])
+    assert result.exit_code == 0
+    assert FakeClient.pulled == []
+
+
+def test_pull_env_var_disables_the_fetch(monkeypatch):
+    _use_fake(monkeypatch, {"a": "quip a"})
+    FakeClient.available = set()
+    result = CliRunner().invoke(cli.main, ["reply", "--line", "a"], env={"DANKBOT_PULL": "0"})
+    assert result.exit_code == 0
+    assert FakeClient.pulled == []
+
+
+def test_listen_fake_fetches_a_missing_model(monkeypatch, tmp_path):
+    _use_fake(monkeypatch, {"the bread is done baking": "Time to toast!"})
+    FakeClient.available = set()
+    lines = tmp_path / "overheard.txt"
+    lines.write_text("the bread is done baking\n")
+    result = CliRunner().invoke(cli.main, ["listen", "--fake", str(lines), "--json"])
+    assert result.exit_code == 0
+    assert FakeClient.pulled == [cli.DEFAULT_MODEL]
 
 
 def test_models_lists_server_models(monkeypatch):

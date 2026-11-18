@@ -29,6 +29,8 @@ tracked in git.
   PyPI name, CI, devcontainer).
 - `docs/plans/jokemark.md` — the model bake-off (`dankbot jokemark`): packaged
   overheard corpus × TOML model matrix → one Markdown report.
+- `docs/plans/modelpull.md` — auto-pull: `reply` / `listen` fetch a model the
+  server does not have yet (`ensure_model`, `--pull/--no-pull`).
 
 Docs that are *not* plans: `docs/TODO.md` (loose backlog), `docs/hardware.md`
 (hardware notes), `docs/responder.md` / `docs/transcribe.md` (research notes).

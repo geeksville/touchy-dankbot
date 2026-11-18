@@ -38,6 +38,7 @@ from .config import (
     DEFAULT_MIN_WORDS,
     DEFAULT_MODEL,
     DEFAULT_MODEL_ARCH,
+    DEFAULT_PULL,
     DEFAULT_TEMPERATURE,
     DEFAULT_TIMEOUT,
     DEFAULT_URL,
@@ -123,6 +124,14 @@ _LLM_OPTIONS = [
         envvar="DANKBOT_TIMEOUT",
         show_default=True,
     ),
+    click.option(
+        "--pull/--no-pull",
+        "pull",
+        default=DEFAULT_PULL,
+        envvar="DANKBOT_PULL",
+        show_default=True,
+        help="Fetch the model from the server when it is not pulled yet.",
+    ),
 ]
 
 
@@ -170,6 +179,7 @@ def _build_responder(
     max_tokens: int,
     native: bool,
     timeout: float,
+    pull: bool,
 ) -> Responder:
     """A :class:`Responder` wired to a live :class:`ChatClient`."""
     if persona_file is not None:
@@ -185,6 +195,8 @@ def _build_responder(
         timeout=timeout,
     )
     client = ChatClient(settings)
+    if pull:  # a fresh box fetches its model instead of 404ing on the first quip
+        client.ensure_model(model)
     return Responder(client.chat, model=model, persona=persona)
 
 
@@ -272,6 +284,7 @@ def reply(
     max_tokens: int,
     native: bool,
     timeout: float,
+    pull: bool,
     json_out: bool,
 ) -> None:
     """Ask the LLM for a witty reply to each overheard line."""
@@ -286,6 +299,7 @@ def reply(
         max_tokens=max_tokens,
         native=native,
         timeout=timeout,
+        pull=pull,
     )
     try:
         for source in _input_lines(line, file):
@@ -394,6 +408,7 @@ def listen(
     max_tokens: int,
     native: bool,
     timeout: float,
+    pull: bool,
     json_out: bool,
 ) -> None:
     """Listen, transcribe, log a witty reply per utterance, and show it on the pad."""
@@ -410,6 +425,7 @@ def listen(
         max_tokens=max_tokens,
         native=native,
         timeout=timeout,
+        pull=pull,
     )
     gate = UtteranceGate(min_words=min_words, min_duration_s=min_duration_s, debounce_s=debounce_s)
     source = (
@@ -506,7 +522,8 @@ def models(url: str, native: bool, timeout: float) -> None:
 @click.option(
     "--pull/--no-pull",
     "pull",
-    default=True,
+    default=DEFAULT_PULL,
+    envvar="DANKBOT_PULL",
     show_default=True,
     help="Fetch models the server does not have yet.",
 )

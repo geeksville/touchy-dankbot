@@ -137,3 +137,35 @@ class ChatClient:
             raise DankbotError(f"{type(exc).__name__}: {exc}") from exc
         if data.get("error"):
             raise DankbotError(f"pull {name}: {data['error']}")
+
+    def ensure_model(self, name: str) -> bool:
+        """Fetch *name* when the server does not have it yet — ``True`` if it did.
+
+        ``dankbot reply`` / ``listen`` call this once at startup, so a fresh box
+        pulls its model on first use instead of failing on the first quip with a
+        404 from ``/v1``.
+
+        Best-effort by design: it must never turn a *working* setup into a
+        failure. A server we cannot ask — down, or not Ollama at all, where
+        ``/api/pull`` does not exist (the ``/v1`` path stays portable to vLLM /
+        ``llama.cpp``) — only earns a log line, and the chat call that follows
+        reports the real problem.
+        """
+        try:
+            if self.has_model(name):
+                return False
+        except DankbotError as exc:
+            log.debug("cannot list the server's models (%s); not fetching %s", exc, name)
+            return False
+        # WARNING, not INFO: the download blocks for minutes and ``reply`` logs
+        # at the default WARNING level, so a quieter line would leave the user
+        # staring at a silent terminal wondering whether it had hung.
+        log.warning(
+            "model %s is not on %s — fetching it (this can take minutes)", name, self._s.url
+        )
+        try:
+            self.pull_model(name)
+        except DankbotError as exc:
+            log.warning("could not fetch %s: %s", name, exc)
+            return False
+        return True

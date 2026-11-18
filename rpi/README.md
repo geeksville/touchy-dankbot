@@ -26,6 +26,17 @@ github cli install
 	&& sudo apt update \
 	&& sudo apt install gh -y
 
+sudo apt install just
+
+curl -sSL https://install.python-poetry.org | python3 -
+echo 'export PATH="$HOME/.local/bin:$PATH"' | tee -a $HOME/.bashrc $HOME/.zshrc
+
+# One-time system prerequisites: PortAudio/ALSA + libusb, the touchy-pad udev
+# rule, and plugdev/dialout/audio membership for your login user. Then log out
+# and back in (group changes do not reach already-running shells).
+bash rpi/install-rpi.sh
+
+just test
 
 ollama run hf.co/bartowski/Hermes-3-Llama-3.2-3B-GGUF # fast ehough to use - actually seems a little funnier than the bigger nemo
 ollama ps

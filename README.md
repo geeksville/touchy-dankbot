@@ -13,9 +13,9 @@ touchy-pad LCD) for a mouth, and it uses an [Ollama] instance for the wit.
 [Ollama]: https://ollama.com
 
 > **Status: early.** Today this is the **responder + listener**: text (or
-> speech) in, quip out — served by a remote Ollama server (no local model),
-> optionally shown on a **touchy-pad**. Speech-to-text runs locally with
-> **Moonshine Voice**. 
+> speech) in, quip out — served by an Ollama server (by default the local
+> `ollama serve`; no model ships with dankbot), optionally shown on a
+> **touchy-pad**. Speech-to-text runs locally with **Moonshine Voice**. 
 
 ## How it works
 
@@ -29,7 +29,7 @@ touchy-pad LCD) for a mouth, and it uses an [Ollama] instance for the wit.
    [ utterance gate ]          >= a few content words, de-duplicated
              |
              v
-   [ dankbot responder ]      a witty line via a remote Ollama LLM
+   [ dankbot responder ]      a witty line via a local Ollama LLM
              |  a one-to-two-sentence quip, or /notfunny
              v
    [ touchy-pad display ]      scrolling marquee (LED) / wrapped text (LCD)
@@ -62,10 +62,11 @@ in 0.4.0); if the published version is too old, run
 `just use-touchy-local`, which clones the git `main` (see [Dev](#dev)).
 Without it the quip still shows, just at full size.
 
-You also need a reachable **Ollama** server — a local `ollama serve`, or a
-remote box over Tailscale / LAN. Point `--url` / `DANKBOT_URL` at it. On first
-use, Moonshine downloads its STT model into `~/.cache/moonshine_voice` and runs
-offline afterwards.
+You also need a reachable **Ollama** server. The default is the local one —
+`ollama serve` on the same box, `http://localhost:11434`; for a remote box over
+Tailscale / LAN, point `--url` / `DANKBOT_URL` at it. On first use, Moonshine
+downloads its STT model into `~/.cache/moonshine_voice` and runs offline
+afterwards.
 
 For the mic you want a real USB array (the Seeed reSpeaker XVF3800 is what this
 was built against — see [docs/hardware.md](docs/hardware.md)); it is auto-selected
@@ -109,7 +110,7 @@ Configuration is **flag -> env -> default** — click implements the precedence:
 
 | Setting | Flag | Env | Default |
 |---|---|---|---|
-| Server URL | `--url` | `DANKBOT_URL` | `https://kai.pygmy-map.ts.net` |
+| Server URL | `--url` | `DANKBOT_URL` | `http://localhost:11434` (local `ollama serve`; the old remote box `https://kai.pygmy-map.ts.net` still works) |
 | Model | `--model` | `DANKBOT_MODEL` | Rocinante-X-12B (Q4_K_M) |
 | Persona | `--persona` / `--persona-file` | `DANKBOT_PERSONA` | the toaster robot |
 | Temperature | `--temperature` | `DANKBOT_TEMP` | `0.9` |
@@ -117,11 +118,22 @@ Configuration is **flag -> env -> default** — click implements the precedence:
 | Context | `--ctx` | `DANKBOT_CTX` | `4096` |
 | Max output tokens | `--max-tokens` | `DANKBOT_MAX_TOKENS` | `120` |
 | Native `/api/chat` | `--native` | `DANKBOT_NATIVE` | off (use `/v1`) |
+| Fetch a missing model | `--pull` / `--no-pull` | `DANKBOT_PULL` | on |
 
 The default is what won the bake-off. Fallbacks, both already in the matrix:
 `--model hf.co/NousResearch/Hermes-3-Llama-3.1-8B-GGUF:latest` (the disciplined
 8B) or `--model hf.co/bartowski/Human-Like-Mistral-Nemo-Instruct-2407-GGUF:Q8_0`
 (the 12B runner-up).
+
+A model the server does not have yet is fetched on first use: `reply` and
+`listen` ask the server what it has at startup and pull the model when it is
+missing, so a fresh box works on the first quip instead of failing with a 404.
+A multi-GB download is a surprise, so it logs a `WARNING` before it starts —
+and `--no-pull` (`DANKBOT_PULL=0`) turns the fetch off. The fetch is
+best-effort: a server that cannot be asked, or that is not Ollama at all
+(`/api/pull` is Ollama-only — the `/v1` path stays portable to vLLM /
+`llama.cpp`), only gets a log line and the chat call reports the real problem.
+`dankbot jokemark` does the same per matrix entry.
 
 Every command also accepts `--debug` (env `DANKBOT_DEBUG`): it lowers the
 Python logging level from `WARNING` to `DEBUG`, so the verbose detail — HTTP
