@@ -11,6 +11,14 @@ deterministic ordering.
 Two sinks fire per event: ``emit`` (log / ``--json``, always) and ``display``
 (optional — :mod:`dankbot.display`'s pad, only on a ``KIND_REPLY``).
 
+Every reply also carries its **pipeline latency**: the wall time from the
+utterance arriving here to the quip being ready. That is the reply-queue wait
+(it is a one-deep queue on a worker thread, so a slow model backs it up) plus
+the model round trip — which is exactly what you want when asking "how far
+behind is the machine?". The log line shows it (``REPLY: … (45s latency)``) and
+``--json`` reports it as ``latency_s``. A *gate* skip never reached the model,
+so it has no latency; a ``/notfunny`` skip does, and says so.
+
 See ``docs/plans/audioin.md`` and ``docs/plans/ledout.md``.
 """
 
@@ -20,6 +28,7 @@ import json
 import logging
 import queue
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -49,8 +58,12 @@ class ListenEvent:
     reason: str = ""  # skip reason (kind == KIND_SKIP); "keep" otherwise
     model: str = ""
     runs: tuple[Run, ...] = ()  # the quip as colour runs (kind == KIND_REPLY)
+    #: Seconds from the utterance arriving to the quip being ready — the
+    #: reply-queue wait plus the model round trip. ``None`` for ``HEARD`` and
+    #: for a gate ``SKIP``, which never reached the responder.
+    latency_s: float | None = None
 
-    def as_dict(self) -> dict[str, str]:
+    def as_dict(self) -> dict[str, object]:
         """The ``--json`` shape."""
         return {
             "event": self.kind,
@@ -58,7 +71,21 @@ class ListenEvent:
             "reply": self.reply,
             "reason": self.reason,
             "model": self.model,
+            "latency_s": None if self.latency_s is None else round(self.latency_s, 2),
         }
+
+
+@dataclass(frozen=True)
+class _Pending:
+    """A queued utterance plus the clock reading it reached the loop at.
+
+    Kept beside :class:`Utterance` rather than added to it: it is the *loop's*
+    bookkeeping (how long this one has been in flight), not a property of what
+    was said.
+    """
+
+    utterance: Utterance
+    heard_at: float
 
 
 Emitter = Callable[[ListenEvent], None]
@@ -69,12 +96,13 @@ def log_emitter(event: ListenEvent) -> None:
 
     The lines are :mod:`rich` texts (see :mod:`dankbot.logs`), so a ``REPLY``
     shows the quip in the colours the display scrolls while its plain text stays
-    ``REPLY: …``.
+    ``REPLY: …``; the one addition is a dim ``(45s latency)`` suffix when the
+    event carries one.
     """
     if event.kind == KIND_REPLY:
-        log.info(logs.reply_line(event.runs, event.reply))
+        log.info(logs.reply_line(event.runs, event.reply, latency_s=event.latency_s))
     elif event.kind == KIND_SKIP:
-        log.info(logs.skip_line(event.reason, event.text))
+        log.info(logs.skip_line(event.reason, event.text, latency_s=event.latency_s))
     else:
         log.info(logs.heard_line(event.text))
 
@@ -147,19 +175,20 @@ class Listener:
                 self.close()
 
     def _handle(self, utterance: Utterance) -> None:
+        heard_at = time.monotonic()  # the clock the reply's latency is measured from
         self._emit(ListenEvent(KIND_HEARD, text=utterance.text))
         decision = self._gate.decide(utterance.text, duration_s=utterance.duration_s)
         if not decision.keep:
             self._emit(ListenEvent(KIND_SKIP, text=utterance.text, reason=decision.reason))
             return
-        self._submit(utterance)
+        self._submit(_Pending(utterance, heard_at))
 
-    def _submit(self, utterance: Utterance) -> None:
+    def _submit(self, pending: _Pending) -> None:
         if self._inline:
-            self._answer(utterance)
+            self._answer(pending)
             return
         try:
-            self._queue.put_nowait(utterance)
+            self._queue.put_nowait(pending)
         except queue.Full:
             # Drop the *oldest* pending utterance and keep the newest.
             try:
@@ -167,7 +196,7 @@ class Listener:
             except queue.Empty:  # pragma: no cover - race, nothing to drop
                 pass
             try:
-                self._queue.put_nowait(utterance)
+                self._queue.put_nowait(pending)
             except queue.Full:  # pragma: no cover - worker ate the slot
                 pass
 
@@ -181,11 +210,21 @@ class Listener:
             except Exception:  # a bad reply must not kill the loop
                 log.exception("reply failed")
 
-    def _answer(self, utterance: Utterance) -> None:
+    def _answer(self, pending: _Pending) -> None:
+        utterance = pending.utterance
         reply = self._responder.respond(utterance.text)
+        # Read the clock *after* the model answered: the wait in the queue plus
+        # the round trip is the number the log reports.
+        latency_s = time.monotonic() - pending.heard_at
         if reply.skip:
             self._emit(
-                ListenEvent(KIND_SKIP, text=utterance.text, reason="notfunny", model=reply.model)
+                ListenEvent(
+                    KIND_SKIP,
+                    text=utterance.text,
+                    reason="notfunny",
+                    model=reply.model,
+                    latency_s=latency_s,
+                )
             )
         else:
             self._emit(
@@ -195,6 +234,7 @@ class Listener:
                     reply=reply.text,
                     model=reply.model,
                     runs=reply.runs,
+                    latency_s=latency_s,
                 )
             )
             if self._display is not None:

@@ -98,6 +98,17 @@ DEFAULT_DEBOUNCE_S = 5.0
 #: and keeps the old "open once, block forever" behaviour.
 DEFAULT_RECONNECT_DELAY_S = 2.0
 
+#: Frames per microphone capture callback (Moonshine's own default). Bigger
+#: means fewer, longer blocks — and, because PortAudio sizes the ALSA ring
+#: buffer from the period count, more slack before an *input overflow* makes the
+#: driver drop audio (``MicTranscriber: input overflow``: the callback was not
+#: serviced in time, which is a CPU-contention symptom, not an audio one). At
+#: the array's 48 kHz, 1024 frames is ~21 ms per block and 4096 is ~85 ms — the
+#: capture→transcript delay grows by the same amount, which is nothing beside a
+#: model round trip. Raise it when overflow lines are continuous rather than a
+#: startup burst; see ``--mic-blocksize``.
+DEFAULT_MIC_BLOCKSIZE = 1024
+
 
 @dataclass(frozen=True)
 class AudioSettings:
@@ -110,6 +121,7 @@ class AudioSettings:
     min_duration_s: float = DEFAULT_MIN_DURATION_S
     debounce_s: float = DEFAULT_DEBOUNCE_S
     reconnect_delay_s: float = DEFAULT_RECONNECT_DELAY_S
+    mic_blocksize: int = DEFAULT_MIC_BLOCKSIZE
 
 
 # ---------------------------------------------------------------------------

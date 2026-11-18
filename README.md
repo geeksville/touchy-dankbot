@@ -219,15 +219,32 @@ display scrolls** for it (see [`src/dankbot/logs.py`](src/dankbot/logs.py)) — 
 a colour reply is visible without the pad. A pipe or `NO_COLOR` falls back to
 plain text, and the message text itself is unchanged.
 
+Every `REPLY:` line also ends with the **pipeline latency** — the wall time from
+the utterance arriving to the quip being ready, so it covers both the wait
+behind a busy reply worker *and* the model round trip: `REPLY: … (45s latency)`.
+A `/notfunny` skip reports it too (it made the same round trip); a gate `SKIP`
+never reached the model, so it has none. `--json` carries the same number as
+`latency_s`.
+
 The microphone is **supervised**: `dankbot listen` watches its PortAudio capture
 stream and, if the array goes away (unplugging the USB cable), re-opens it — so
 plugging the mic back in brings the ears back with no restart, even if it lands
 on a different device index. Boot with no mic is still a hard error.
 
+`--mic-blocksize` is the **input-overflow** lever. PortAudio reports an overflow
+(Moonshine prints `MicTranscriber: input overflow`) when the capture callback was
+not serviced in time, and the driver **drops frames** — a CPU-contention symptom,
+not an audio one, and one that appears in a quiet room just as much, since the
+engine streams and VAD-decodes every block regardless of what it hears. A bigger
+block grows the driver's ring buffer (~21 ms per 1024 frames at 48 kHz) and buys
+slack; it costs the same in capture→transcript delay, which is nothing next to a
+model round trip.
+
 | Setting | Flag | Env | Default |
 |---|---|---|---|
 | Capture device | `--device` | `DANKBOT_MIC` | auto (name ~ `respeaker`) |
 | STT model size | `--model-arch` | `DANKBOT_MODEL_ARCH` | `small` (tiny/base/small/medium) |
+| Mic capture block | `--mic-blocksize` | `DANKBOT_MIC_BLOCKSIZE` | `1024` frames (~21 ms at 48 kHz) |
 | Min content words | `--min-words` | `DANKBOT_MIN_WORDS` | `3` |
 | Min duration (s) | `--min-duration` | `DANKBOT_MIN_DURATION` | `0.6` |
 | Repeat debounce (s) | `--debounce` | `DANKBOT_DEBOUNCE` | `5.0` |

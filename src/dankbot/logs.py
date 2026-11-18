@@ -8,7 +8,10 @@ without looking at the pad.
 Only the *presentation* changes. Every record's message is still the plain
 ``REPLY: Danger ahead`` / ``SKIP(too_short): uh`` / ``HEARD: …`` text, so
 ``--json`` consumers, ``grep`` and ``caplog`` are unaffected — and rich drops
-the colours by itself when the output is a pipe or ``NO_COLOR`` is set.
+the colours by itself when the output is a pipe or ``NO_COLOR`` is set. The one
+addition is the pipeline latency a reply can carry, as a dim suffix that reads
+as metadata rather than as part of the quip: ``REPLY: Danger ahead (45s
+latency)`` (see :func:`format_latency`).
 
 The pieces:
 
@@ -60,6 +63,22 @@ def runs_text(runs: Sequence[Run]) -> Text:
     return text
 
 
+def format_latency(seconds: float) -> str:
+    """A pipeline duration for the log: ``3.75`` → ``'3.8s'``, ``45.2`` → ``'45s'``.
+
+    One decimal while it is a small number (where the fraction is worth
+    reading), whole seconds once it is not — the same shape as the "45s
+    latency" you would say out loud.
+    """
+    return f"{seconds:.1f}s" if seconds < 10 else f"{seconds:.0f}s"
+
+
+def _append_latency(line: Text, latency_s: float | None) -> None:
+    """Add `` (45s latency)`` when there is one — dim, so it reads as metadata."""
+    if latency_s is not None:
+        line.append(f" ({format_latency(latency_s)} latency)", style=DIM_STYLE)
+
+
 def heard_line(text: str) -> Text:
     """``HEARD: <text>`` — what the mic (or ``--fake``) picked up."""
     line = Text()
@@ -68,23 +87,32 @@ def heard_line(text: str) -> Text:
     return line
 
 
-def skip_line(reason: str, text: str) -> Text:
-    """``SKIP(<reason>): <text>`` — an utterance that never got a reply."""
+def skip_line(reason: str, text: str, latency_s: float | None = None) -> Text:
+    """``SKIP(<reason>): <text>`` — an utterance that never got a quip.
+
+    *latency_s* is set only for a skip the *model* decided (``/notfunny``): it
+    made the same round trip as a reply, so it reports the same timing. A gate
+    skip never reached the model and has none.
+    """
     line = Text()
     line.append("SKIP", style=SKIP_STYLE)
     line.append(f"({reason}): ", style=DIM_STYLE)
     line.append(text, style=DIM_STYLE)
+    _append_latency(line, latency_s)
     return line
 
 
-def reply_line(runs: Sequence[Run], text: str = "") -> Text:
+def reply_line(runs: Sequence[Run], text: str = "", latency_s: float | None = None) -> Text:
     """``REPLY: <quip>`` — the quip in the colours the display will scroll.
 
     *text* is the fallback when there are no runs (the plain, command-free text).
+    *latency_s* appends the pipeline latency (utterance heard → quip ready) as a
+    dim suffix, so a slow or backed-up model stage is visible in the log.
     """
     line = Text()
     line.append("REPLY: ", style=REPLY_STYLE)
     line.append_text(runs_text(runs) if runs else Text(text))
+    _append_latency(line, latency_s)
     return line
 
 

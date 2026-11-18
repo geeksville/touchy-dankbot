@@ -60,6 +60,31 @@ def test_the_three_lines_keep_their_plain_text():
     assert str(logs.reply_line((), "no runs")) == "REPLY: no runs"
 
 
+def test_format_latency_reads_in_seconds():
+    assert logs.format_latency(0.42) == "0.4s"
+    assert logs.format_latency(3.75) == "3.8s"
+    assert logs.format_latency(9.94) == "9.9s"
+    assert logs.format_latency(10.0) == "10s"
+    assert logs.format_latency(45.2) == "45s"
+    assert logs.format_latency(103.6) == "104s"
+
+
+def test_a_reply_line_carries_the_pipeline_latency_as_dim_metadata():
+    line = logs.reply_line((Run("Danger", COLOURS["red"]),), latency_s=45.2)
+    assert str(line) == "REPLY: Danger (45s latency)"
+    assert line.spans[-1].style == logs.DIM_STYLE  # metadata, not part of the quip
+    assert (line.spans[-1].start, line.spans[-1].end) == (13, len(str(line)))
+
+
+def test_a_skip_line_carries_a_latency_only_when_the_model_ran():
+    assert str(logs.skip_line("too_short", "uh", latency_s=0.3)) == (
+        "SKIP(too_short): uh (0.3s latency)"
+    )
+    assert str(logs.skip_line("notfunny", "meh", latency_s=12.0)) == (
+        "SKIP(notfunny): meh (12s latency)"
+    )
+
+
 def test_the_playback_line_keeps_the_context_and_the_quip():
     line = logs.playback_line("one", "the light is red", (Run("Danger", COLOURS["red"]),))
     assert str(line) == "one · the light is red → REPLY: Danger"
@@ -105,6 +130,20 @@ def test_the_listen_emitter_logs_the_quip_as_colour_runs(caplog):
         (7, 13, "#ff0000"),
         (13, 19, "#ffffff"),
     ]
+
+
+def test_the_listen_emitter_reports_a_reply_latency(caplog):
+    event = ListenEvent(
+        KIND_REPLY,
+        text="the light is red",
+        reply="Danger ahead",
+        model="m",
+        runs=(Run("Danger", COLOURS["red"]), Run(" ahead", WHITE)),
+        latency_s=45.2,
+    )
+    with caplog.at_level(logging.INFO, logger="dankbot.listen"):
+        log_emitter(event)
+    assert caplog.records[-1].getMessage() == "REPLY: Danger ahead (45s latency)"
 
 
 def test_configure_installs_one_handler(monkeypatch):

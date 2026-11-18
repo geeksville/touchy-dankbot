@@ -67,6 +67,22 @@ class FakeDisplay:
         self.closed = True
 
 
+class FakeAudioIn:
+    """Stand-in for ``dankbot.audio.AudioIn`` — records how it was built, no mic."""
+
+    instances: ClassVar[list[FakeAudioIn]] = []
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+        FakeAudioIn.instances.append(self)
+
+    def lines(self):
+        return iter(())
+
+    def close(self):
+        pass
+
+
 def _use_fake(monkeypatch, replies=None, client=None):
     FakeClient.replies = replies or {}
     FakeClient.available = None
@@ -288,6 +304,24 @@ def test_an_unknown_display_mode_is_rejected(monkeypatch, tmp_path):
     )
     assert result.exit_code != 0
     assert FakeDisplay.instances == []
+
+
+def test_listen_passes_the_mic_blocksize_to_the_capture(monkeypatch):
+    _use_fake(monkeypatch)
+    monkeypatch.setattr(cli, "AudioIn", FakeAudioIn)
+    FakeAudioIn.instances = []
+    result = CliRunner().invoke(cli.main, ["listen", "--mic-blocksize", "4096"])
+    assert result.exit_code == 0
+    assert FakeAudioIn.instances[0].kwargs["blocksize"] == 4096
+
+
+def test_listen_defaults_the_mic_blocksize_to_the_config_default(monkeypatch):
+    _use_fake(monkeypatch)
+    monkeypatch.setattr(cli, "AudioIn", FakeAudioIn)
+    FakeAudioIn.instances = []
+    result = CliRunner().invoke(cli.main, ["listen"])
+    assert result.exit_code == 0
+    assert FakeAudioIn.instances[0].kwargs["blocksize"] == cli.DEFAULT_MIC_BLOCKSIZE
 
 
 def test_listen_logs_heard_and_reply(monkeypatch, tmp_path, caplog):

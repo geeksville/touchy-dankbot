@@ -184,6 +184,7 @@ class AudioIn:
         language: str = "en",
         models_dir: str | Path | None = None,
         channels: int | None = None,
+        blocksize: int | None = None,
         options: dict | None = None,
         reconnect_delay_s: float = DEFAULT_RECONNECT_DELAY_S,
     ) -> None:
@@ -194,6 +195,7 @@ class AudioIn:
         self._language = language
         self._models_dir = models_dir
         self._channels = channels
+        self._blocksize = blocksize
         self._options = options or {}
         # How long to wait between liveness checks / re-open attempts; <= 0
         # turns supervision off and keeps the old "open once, block" behaviour.
@@ -242,6 +244,10 @@ class AudioIn:
             mic.device(self._device)
         if self._channels is not None:
             mic.channels(self._channels)
+        if self._blocksize is not None:
+            # Bigger blocks = a bigger driver ring buffer = more slack before an
+            # input overflow drops audio (see DEFAULT_MIC_BLOCKSIZE).
+            mic.blocksize(self._blocksize)
         if self._models_dir is not None:
             mic.models_from(str(self._models_dir))
         if self._options:

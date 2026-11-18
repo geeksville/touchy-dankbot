@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 
 from dankbot.audio import FakeTranscriptSource
 from dankbot.gate import UtteranceGate
@@ -122,14 +123,20 @@ def test_a_failing_reply_does_not_kill_the_loop():
 
 
 def test_json_emitter_shape(capsys):
-    json_emitter(ListenEvent(KIND_REPLY, text="a", reply="b", model="m"))
+    json_emitter(ListenEvent(KIND_REPLY, text="a", reply="b", model="m", latency_s=45.234))
     assert json.loads(capsys.readouterr().out) == {
         "event": "reply",
         "heard": "a",
         "reply": "b",
         "reason": "",
         "model": "m",
+        "latency_s": 45.23,
     }
+
+
+def test_json_reports_no_latency_before_the_model_has_answered(capsys):
+    json_emitter(ListenEvent(KIND_HEARD, text="a"))
+    assert json.loads(capsys.readouterr().out)["latency_s"] is None
 
 
 def test_events_are_logged_by_default(caplog):
@@ -166,3 +173,63 @@ def test_a_broken_display_sink_does_not_kill_the_loop():
     )
     listener.run(FakeTranscriptSource(["the bread is done baking"]))
     assert any(e.kind == KIND_REPLY for e in events)
+
+
+# -- pipeline latency: "how far behind is the machine?" ----------------------
+
+
+def test_a_reply_reports_the_pipeline_latency():
+    def chat(messages):
+        time.sleep(0.05)  # a slow model stage
+        return "Time to toast!"
+
+    events, emit = _collector()
+    listener = Listener(
+        Responder(chat, model="m"), UtteranceGate(min_words=1), emit=emit, inline=True
+    )
+    listener.run(FakeTranscriptSource(["the bread is done baking"]))
+    reply = next(e for e in events if e.kind == KIND_REPLY)
+    assert reply.latency_s >= 0.05
+    assert next(e for e in events if e.kind == KIND_HEARD).latency_s is None
+
+
+def test_a_gate_skip_has_no_latency_because_the_model_never_ran():
+    events, emit = _collector()
+    listener = Listener(_responder(), UtteranceGate(min_words=3), emit=emit, inline=True)
+    listener.run(FakeTranscriptSource(["uh"]))
+    skip = next(e for e in events if e.kind == KIND_SKIP)
+    assert skip.reason == "too_short"
+    assert skip.latency_s is None
+
+
+def test_a_notfunny_skip_reports_the_latency_of_its_round_trip():
+    def chat(messages):
+        time.sleep(0.05)
+        return "/notfunny"
+
+    events, emit = _collector()
+    listener = Listener(
+        Responder(chat, model="m"), UtteranceGate(min_words=1), emit=emit, inline=True
+    )
+    listener.run(FakeTranscriptSource(["nothing to see here"]))
+    skip = next(e for e in events if e.kind == KIND_SKIP)
+    assert skip.reason == "notfunny"
+    assert skip.latency_s >= 0.05
+
+
+def test_latency_counts_the_wait_behind_a_busy_reply_queue():
+    """The second reply's own model call is instant — the time it reports is the backlog."""
+
+    def chat(messages):
+        if messages[-1]["content"] == "alpha one two":
+            time.sleep(0.1)  # one slow reply, so the next one has to wait for the worker
+        return "ok"
+
+    events, emit = _collector()
+    listener = Listener(
+        Responder(chat, model="m"), UtteranceGate(min_words=1), emit=emit, max_queued=4
+    )
+    listener.run(FakeTranscriptSource(["alpha one two", "charlie one two"]))
+    latency = {e.text: e.latency_s for e in events if e.kind == KIND_REPLY}
+    assert latency["alpha one two"] >= 0.1  # its own slow model
+    assert latency["charlie one two"] >= 0.09  # queued behind it, not its own model

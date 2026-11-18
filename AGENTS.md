@@ -95,7 +95,10 @@ just bump-version          # bump version, commit, tag, push
   lines come from `logs.heard_line` / `skip_line` /
   `reply_line`, which draw a quip in its display colours; keep their *plain*
   text (`REPLY: …`, `SKIP(too_short): …`) intact — `grep` and `caplog` rely on
-  it. High-frequency RPC-ish lines go on a child logger.
+  it. A reply (and a `/notfunny` skip) appends the pipeline latency as a dim
+  `(45s latency)` suffix — `Listener._answer` measures the wait plus the model
+  round trip; keep the suffix *after* the plain text. High-frequency RPC-ish
+  lines go on a child logger.
 - **The `/command` contract** lives in `commands.py`; recognised commands are
   stripped from every displayed/printed reply (unknown slash tokens are recovered
   as text). Keep `/notfunny` as the final backstop. Markdown emphasis

@@ -115,6 +115,7 @@ def _install_fake_moonshine(monkeypatch, script):
             self.spec = pending.pop(0) if pending else {}
             self.closed = False
             self.line_cb = None
+            self.blocksize_frames = None
             self._sd_stream = (
                 None
                 if self.spec.get("no_stream")
@@ -132,6 +133,10 @@ def _install_fake_moonshine(monkeypatch, script):
             return self
 
         def channels(self, count):
+            return self
+
+        def blocksize(self, frames):
+            self.blocksize_frames = frames
             return self
 
         def models_from(self, directory):
@@ -252,6 +257,22 @@ def test_build_wires_on_error_and_releases_the_engine_when_start_fails(monkeypat
 
 
 # -- supervision: an unplugged mic must not leave the loop mute --------------
+
+
+def test_a_capture_blocksize_reaches_the_transcriber(monkeypatch):
+    _install_fake_sounddevice(monkeypatch, [])
+    built = _install_fake_moonshine(monkeypatch, [{}])
+    audio_in = AudioIn(model_arch="small", blocksize=4096)
+    audio_in._build(audio_in._engine())
+    assert built[0].blocksize_frames == 4096
+
+
+def test_without_a_blocksize_the_library_default_stands(monkeypatch):
+    _install_fake_sounddevice(monkeypatch, [])
+    built = _install_fake_moonshine(monkeypatch, [{}])
+    audio_in = AudioIn(model_arch="small")
+    audio_in._build(audio_in._engine())
+    assert built[0].blocksize_frames is None  # we never override Moonshine's own default
 
 
 def test_capture_probe_assumes_the_mic_is_fine_when_it_cannot_tell():

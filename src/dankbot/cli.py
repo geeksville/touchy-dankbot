@@ -33,6 +33,7 @@ from .config import (
     DEFAULT_DEBOUNCE_S,
     DEFAULT_DISPLAY_MODE,
     DEFAULT_MAX_TOKENS,
+    DEFAULT_MIC_BLOCKSIZE,
     DEFAULT_MIN_DURATION_S,
     DEFAULT_MIN_P,
     DEFAULT_MIN_WORDS,
@@ -333,6 +334,15 @@ def reply(
     help="STT model size: tiny|base|small|medium (all streaming).",
 )
 @click.option(
+    "--mic-blocksize",
+    "mic_blocksize",
+    type=int,
+    default=DEFAULT_MIC_BLOCKSIZE,
+    envvar="DANKBOT_MIC_BLOCKSIZE",
+    show_default=True,
+    help="Frames per mic capture callback: raise it to buy slack against input overflow.",
+)
+@click.option(
     "--min-words",
     "min_words",
     type=int,
@@ -392,6 +402,7 @@ def listen(
     fake: TextIO | None,
     device: str | None,
     model_arch: str,
+    mic_blocksize: int,
     min_words: int,
     min_duration_s: float,
     debounce_s: float,
@@ -431,7 +442,7 @@ def listen(
     source = (
         FakeTranscriptSource(read_lines(fake))
         if fake is not None
-        else AudioIn(device=device, model_arch=model_arch)
+        else AudioIn(device=device, model_arch=model_arch, blocksize=mic_blocksize)
     )
     display = _make_display(screen_name, clear_after_s, display_mode)
     listener = Listener(
