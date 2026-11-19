@@ -78,6 +78,26 @@ DEFAULT_MIC_HINT = "respeaker"
 #: (245M). Small is the Pi-friendly default; see the plan's Q2.
 DEFAULT_MODEL_ARCH = "small"
 
+#: Moonshine's VAD sensitivity (``vad_threshold``), i.e. where the probability
+#: of speech has to sit for the engine to call a segment finished. The library's
+#: own default: "lower → longer segments; higher → shorter chunks". A speaker
+#: who pauses mid-sentence gets split into separate ``LineCompleted`` events at
+#: the default, so lower it (0.35–0.4) to keep a slight pause inside one line;
+#: 0 disables VAD entirely and lets ``vad_max_segment_duration`` (15 s) chunk the
+#: audio instead. Too low starts treating room noise as speech. See
+#: https://moonshine-voice.readthedocs.io/en/latest/api/options/.
+DEFAULT_VAD_THRESHOLD = 0.2
+
+#: Seconds of VAD scores Moonshine averages when deciding whether someone is
+#: speaking (the library's own default is 0.5). A longer window rides through a
+#: brief dip in speech probability, so a slight mid-sentence pause no longer
+#: ends the line — 1.0 s is the default here. The ~0.5 s of detection lag that
+#: introduces is what ``vad_look_behind_sample_count`` (8192 samples ≈ 0.51 s at
+#: 16 kHz) prepends, so the first word is not clipped. It costs that much extra
+#: latency before a line starts; much past 1 s risks eating the onset. A value
+#: ``<= 0`` is rejected by the CLI (it would average no scores at all).
+DEFAULT_VAD_WINDOW_DURATION = 1.0
+
 #: Answer only utterances with at least this many *content* words (filler
 #: stripped) — "a text snippet of at least a few words" (plan Q3).
 DEFAULT_MIN_WORDS = 3
@@ -117,6 +137,8 @@ class AudioSettings:
     device: int | str | None = None
     mic_hint: str | None = DEFAULT_MIC_HINT
     model_arch: str = DEFAULT_MODEL_ARCH
+    vad_threshold: float = DEFAULT_VAD_THRESHOLD
+    vad_window_duration: float = DEFAULT_VAD_WINDOW_DURATION
     min_words: int = DEFAULT_MIN_WORDS
     min_duration_s: float = DEFAULT_MIN_DURATION_S
     debounce_s: float = DEFAULT_DEBOUNCE_S

@@ -251,6 +251,10 @@ class AudioIn:
         if self._models_dir is not None:
             mic.models_from(str(self._models_dir))
         if self._options:
+            # The escape hatch for engine tuning, e.g. {"vad_threshold": 0.35}:
+            # how long a slight pause may be before a line is called finished
+            # (see DEFAULT_VAD_THRESHOLD in config.py).
+            log.debug("transcriber options: %s", self._options)
             mic.options(self._options)
         mic.on_line(self._on_line)
         mic.on_error(self._on_error)

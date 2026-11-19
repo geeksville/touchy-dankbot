@@ -143,6 +143,7 @@ def _install_fake_moonshine(monkeypatch, script):
             return self
 
         def options(self, options):
+            self.stt_options = dict(options)
             return self
 
         def on_line(self, callback):
@@ -273,6 +274,24 @@ def test_without_a_blocksize_the_library_default_stands(monkeypatch):
     audio_in = AudioIn(model_arch="small")
     audio_in._build(audio_in._engine())
     assert built[0].blocksize_frames is None  # we never override Moonshine's own default
+
+
+def test_the_vad_settings_reach_the_transcriber(monkeypatch):
+    """A lower threshold and a longer window keep a slight pause inside one line."""
+    _install_fake_sounddevice(monkeypatch, [])
+    built = _install_fake_moonshine(monkeypatch, [{}])
+    options = {"vad_threshold": 0.35, "vad_window_duration": 1.0}
+    audio_in = AudioIn(model_arch="small", options=options)
+    audio_in._build(audio_in._engine())
+    assert built[0].stt_options == options
+
+
+def test_without_options_moonshine_defaults_stand(monkeypatch):
+    _install_fake_sounddevice(monkeypatch, [])
+    built = _install_fake_moonshine(monkeypatch, [{}])
+    audio_in = AudioIn(model_arch="small")
+    audio_in._build(audio_in._engine())
+    assert not hasattr(built[0], "stt_options")  # we never called options()
 
 
 def test_capture_probe_assumes_the_mic_is_fine_when_it_cannot_tell():

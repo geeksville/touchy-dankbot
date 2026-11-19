@@ -324,6 +324,51 @@ def test_listen_defaults_the_mic_blocksize_to_the_config_default(monkeypatch):
     assert FakeAudioIn.instances[0].kwargs["blocksize"] == cli.DEFAULT_MIC_BLOCKSIZE
 
 
+def test_listen_passes_the_vad_settings_to_the_capture(monkeypatch):
+    _use_fake(monkeypatch)
+    monkeypatch.setattr(cli, "AudioIn", FakeAudioIn)
+    FakeAudioIn.instances = []
+    result = CliRunner().invoke(
+        cli.main, ["listen", "--vad-threshold", "0.35", "--vad-window-duration", "1.5"]
+    )
+    assert result.exit_code == 0
+    assert FakeAudioIn.instances[0].kwargs["options"] == {
+        "vad_threshold": 0.35,
+        "vad_window_duration": 1.5,
+    }
+
+
+def test_listen_defaults_the_vad_settings_to_the_config_defaults(monkeypatch):
+    _use_fake(monkeypatch)
+    monkeypatch.setattr(cli, "AudioIn", FakeAudioIn)
+    FakeAudioIn.instances = []
+    result = CliRunner().invoke(cli.main, ["listen"])
+    assert result.exit_code == 0
+    assert FakeAudioIn.instances[0].kwargs["options"] == {
+        "vad_threshold": cli.DEFAULT_VAD_THRESHOLD,
+        "vad_window_duration": cli.DEFAULT_VAD_WINDOW_DURATION,
+    }
+    assert cli.DEFAULT_VAD_WINDOW_DURATION == 1.0  # one second of VAD averaging
+
+
+def test_listen_rejects_a_vad_threshold_outside_zero_to_one(monkeypatch):
+    _use_fake(monkeypatch)
+    monkeypatch.setattr(cli, "AudioIn", FakeAudioIn)
+    FakeAudioIn.instances = []
+    result = CliRunner().invoke(cli.main, ["listen", "--vad-threshold", "5"])
+    assert result.exit_code != 0
+    assert FakeAudioIn.instances == []
+
+
+def test_listen_rejects_a_non_positive_vad_window(monkeypatch):
+    _use_fake(monkeypatch)
+    monkeypatch.setattr(cli, "AudioIn", FakeAudioIn)
+    FakeAudioIn.instances = []
+    result = CliRunner().invoke(cli.main, ["listen", "--vad-window-duration", "0"])
+    assert result.exit_code != 0
+    assert FakeAudioIn.instances == []
+
+
 def test_listen_logs_heard_and_reply(monkeypatch, tmp_path, caplog):
     import logging
 

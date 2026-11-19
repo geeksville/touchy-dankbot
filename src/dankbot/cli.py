@@ -43,6 +43,8 @@ from .config import (
     DEFAULT_TEMPERATURE,
     DEFAULT_TIMEOUT,
     DEFAULT_URL,
+    DEFAULT_VAD_THRESHOLD,
+    DEFAULT_VAD_WINDOW_DURATION,
     Settings,
 )
 from .display import DEFAULT_CLEAR_AFTER_S, DISPLAY_MODES, SCREEN_NAME, PadDisplay
@@ -334,6 +336,30 @@ def reply(
     help="STT model size: tiny|base|small|medium (all streaming).",
 )
 @click.option(
+    "--vad-threshold",
+    "vad_threshold",
+    type=click.FloatRange(0.0, 1.0),
+    default=DEFAULT_VAD_THRESHOLD,
+    envvar="DANKBOT_VAD_THRESHOLD",
+    show_default=True,
+    help=(
+        "STT voice-activity sensitivity: lower keeps a slight pause inside one "
+        "line (longer utterances), higher splits sooner; 0 disables VAD."
+    ),
+)
+@click.option(
+    "--vad-window-duration",
+    "vad_window_duration",
+    type=click.FloatRange(0.0, min_open=True),
+    default=DEFAULT_VAD_WINDOW_DURATION,
+    envvar="DANKBOT_VAD_WINDOW_DURATION",
+    show_default=True,
+    help=(
+        "Seconds of VAD scores to average: a longer window rides through a "
+        "slight pause instead of ending the line."
+    ),
+)
+@click.option(
     "--mic-blocksize",
     "mic_blocksize",
     type=int,
@@ -402,6 +428,8 @@ def listen(
     fake: TextIO | None,
     device: str | None,
     model_arch: str,
+    vad_threshold: float,
+    vad_window_duration: float,
     mic_blocksize: int,
     min_words: int,
     min_duration_s: float,
@@ -442,7 +470,15 @@ def listen(
     source = (
         FakeTranscriptSource(read_lines(fake))
         if fake is not None
-        else AudioIn(device=device, model_arch=model_arch, blocksize=mic_blocksize)
+        else AudioIn(
+            device=device,
+            model_arch=model_arch,
+            blocksize=mic_blocksize,
+            options={
+                "vad_threshold": vad_threshold,
+                "vad_window_duration": vad_window_duration,
+            },
+        )
     )
     display = _make_display(screen_name, clear_after_s, display_mode)
     listener = Listener(

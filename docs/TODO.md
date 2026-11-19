@@ -8,8 +8,9 @@ misc
 * use thought bubbles
 * !add ai usage to readme
 * overhaul the readme (local ai no creeper)
+* magic 8 ball
 * thank model author https://huggingface.co/TheDrummer/Rocinante-X-12B-v1-GGUF
-* thank voice author
+* thank voice author - post in the discord
 
 * make demo video
 * pitch for layout eink screens for each stage (voice rec - thinking - output (optional - will be on scrolling led anyways)). rated g filter.
