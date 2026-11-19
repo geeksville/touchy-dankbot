@@ -5,12 +5,18 @@ misc
 * do touchy release
 * !use funnier model - done: `DEFAULT_MODEL` is Rocinante-X 12B Q4_K_M (jokemark pick)
 * !use colors for empasis
+* print a case
+* make display brighter
+* add a medium sized font
+* tell it is a magic 8 ball trying to say funny things
 * use thought bubbles
 * !add ai usage to readme
 * overhaul the readme (local ai no creeper)
 * magic 8 ball
 * thank model author https://huggingface.co/TheDrummer/Rocinante-X-12B-v1-GGUF
 * thank voice author - post in the discord
+* thank llama
+* make fs read only
 
 * make demo video
 * pitch for layout eink screens for each stage (voice rec - thinking - output (optional - will be on scrolling led anyways)). rated g filter.
