@@ -259,7 +259,7 @@ def test_an_unknown_mode_falls_back_to_the_height_rule():
 
 @pytest.mark.parametrize(
     ("height", "inset", "font"),
-    [(272, 8, 30), (64, 8, 16), (48, 6, 16), (33, 4, 8)],
+    [(272, 8, 30), (64, 8, 24), (48, 6, 16), (33, 4, 8)],
 )
 def test_panel_padding_and_font(height, inset, font):
     assert panel_inset(height) == inset
@@ -274,7 +274,9 @@ def test_panel_padding_and_font(height, inset, font):
     ("width", "height", "font", "capacity"),
     [
         (480, 272, 30, 168),  # the attached LCD: ~7 lines of 24 characters
+        (480, 272, 24, 248),  # the middle rung: ~8 lines of 31 characters
         (480, 272, 16, 598),  # more than the 511-character protocol cap
+        (128, 64, 24, 7),  # one 24-px line — what font_for_panel(64) builds
         (128, 64, 16, 22),
         (128, 48, 8, 69),
     ],
@@ -290,7 +292,17 @@ def test_a_smaller_font_fits_more():
 
 @pytest.mark.parametrize(
     ("chars", "font"),
-    [(0, 30), (60, 30), (168, 30), (169, 16), (200, 16), (511, 16), (600, 8)],
+    [
+        (0, 30),
+        (60, 30),
+        (168, 30),  # the last quip 30 px holds on the LCD
+        (169, 24),  # … so the next character steps down to 24, not straight to 16
+        (200, 24),
+        (248, 24),  # the last quip 24 px holds
+        (249, 16),
+        (511, 16),  # the protocol cap still fits at 16
+        (600, 8),
+    ],
 )
 def test_font_for_text_steps_down_for_a_long_quip(chars, font):
     assert font_for_text(480, 272, chars) == font
@@ -300,6 +312,20 @@ def test_font_for_text_never_leaves_the_compiled_sizes():
     for chars in (0, 1, 500, 5000):
         assert font_for_text(480, 272, chars) in FONT_SIZES
     assert font_for_text(32, 8, 5000) in FONT_SIZES
+
+
+def test_the_tiers_are_sizes_the_firmware_compiles():
+    """Our tiers must stay inside the host library's ``FONT_SIZES``.
+
+    ``build_property_override(…, "text_font", size)`` raises ``ValueError`` for a
+    size outside the set touchy-pad publishes, and that refusal would look like a
+    lost pad (the quip would not render at all) rather than a smaller font. The
+    device only renders the fonts its build compiled, so this is the one place
+    the two lists meet — 24 px arrived with touchy-pad 1.0.0.
+    """
+    api = pytest.importorskip("touchy_pad.api")
+    assert 24 in FONT_SIZES
+    assert set(FONT_SIZES) <= set(api.FONT_SIZES)
 
 
 def test_font_for_text_keeps_an_explicit_size_as_the_ceiling():
@@ -436,11 +462,20 @@ def test_a_short_quip_keeps_the_lcd_font():
     assert pad.texts() == ["Short and sweet."]
 
 
-def test_a_long_quip_steps_down_to_the_smaller_font():
+def test_a_long_quip_steps_down_to_the_middle_font():
+    """169–248 drawn characters fit the LCD at 24 px, so they land there."""
     pad = FakePad(width=480, height=272)
     PadDisplay(pad, clear_after=0).show([Run("x" * 200)])
-    assert pad.fonts() == [16]
+    assert pad.fonts() == [24]
     assert len(pad.saved) == 1  # a property override, not a screen rebuild
+
+
+def test_a_very_long_quip_steps_past_the_middle_font():
+    """Past 24 px's 248 characters the ladder continues to 16 — never straight
+    from 30 to 8, and never off the ladder (the pad only has these fonts)."""
+    pad = FakePad(width=480, height=272)
+    PadDisplay(pad, clear_after=0).show([Run("x" * 300)])
+    assert pad.fonts() == [16]
 
 
 def test_the_text_and_the_font_are_one_batch():
@@ -458,12 +493,12 @@ def test_the_marquee_keeps_its_font_however_long_the_quip():
 
 
 def test_the_font_is_sent_every_quip_so_a_stale_override_cannot_stick():
-    """Overrides are sticky on the device — a restart must not inherit 16 px."""
+    """Overrides are sticky on the device — a restart must not inherit a small font."""
     pad = FakePad(width=480, height=272)
     display = PadDisplay(pad, clear_after=0)
     display.show([Run("x" * 200)])
     display.show([Run("Short.")])
-    assert pad.fonts() == [16, 30]
+    assert pad.fonts() == [24, 30]
 
 
 def test_an_explicit_font_size_is_never_exceeded():

@@ -52,15 +52,15 @@ pip install touchy-dankbot    # or:  pipx install touchy-dankbot
 ```
 
 That pulls the [`touchy-pad`](https://pypi.org/project/touchy-pad/) host library
-(**>= 0.4.0**) from PyPI for the pad output. The LLM / STT half needs no
+(**>= 1.0.0**) from PyPI for the pad output. The LLM / STT half needs no
 touchy-pad at all — with no pad attached the display is simply a logged warning.
 The display relies on a recent touchy-pad host API
 (`SetPropertiesCmd` / `build_property_override` + inline-recolour labels,
 `scroll_speed_px_s` for the marquee speed, and the `text_font` override that
-steps a long quip down a font size — that last one needs **stage lb26**, shipped
-in 0.4.0); if the published version is too old, run
-`just use-touchy-local`, which clones the git `main` (see [Dev](#dev)).
-Without it the quip still shows, just at full size.
+steps a long quip down a font size — that last one needs **stage lb26** and the
+24-px font the published set grew to, both in 1.0.0); if the published version is
+too old, run `just use-touchy-local`, which clones the git `main` (see
+[Dev](#dev)). Without it the quip still shows, just at full size.
 
 You also need a reachable **Ollama** server. The default is the local one —
 `ollama serve` on the same box, `http://localhost:11434`; for a remote box over
@@ -312,13 +312,15 @@ inline recolour on **both** layouts — e.g. `/color/red Danger ahead` shows
   all just log a warning and retry. Swapping an LED matrix for an LCD (or back)
   rebuilds the screen in the other layout on the next quip.
 * Geometry and the base font come from the board's reported display size, so the
-  same code drives an 8x8 / 32x8 LED matrix and a 480x272 LCD; 8/16/30 px are the
-  compiled fonts, and the LCD picks the largest that leaves two lines.
+  same code drives an 8x8 / 32x8 LED matrix and a 480x272 LCD; 8, 16, 24 and 30 px
+  are the tiers it picks between (14 px, the theme default, is skipped on
+  purpose), and the LCD picks the largest that leaves two lines.
 * A **long quip steps down to a smaller font** instead of being cut off: the
   label's drawn length (colour markup excluded) is fitted to the field, and the
-  `text_font` pixel size rides in the same property batch as the text — ~170
-  characters fit at 30 px on the LCD, 500+ at 16 px. The marquee never needs
-  this (it scrolls forever). See
+  `text_font` pixel size rides in the same property batch as the text — on the LCD
+  ~170 characters fit at 30 px, ~250 at 24 px and 500+ at 16 px, so a long quip
+  lands on the *largest* font that still fits rather than jumping to the smallest.
+  The marquee never needs this (it scrolls forever). See
   [docs/plans/quipfit.md](docs/plans/quipfit.md).
 * A **fresh LED board is headless** (`0x0`) until its panel chain is
   provisioned: `touchy pref from-template led-32x8`. dankbot says so if it sees

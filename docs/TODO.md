@@ -1,4 +1,5 @@
 misc
+* !verify the 24 px middle rung on glass - touchy-pad 1.0.0 added the tier, so a ~200-char quip should now draw at 24 px (not 16); eyeball it across the desk, and re-check on an LED matrix (`docs/plans/quipfit.md` addendum)
 * !investigate growing `listen` latency - instrumented: `REPLY:` suffix splits queue wait vs model time (`docs/plans/latency.md`); read a real run to see which term climbs
 * !fix scrolling rate - done: touchy-pad LB19 `scroll_speed_px_s`, dankbot scrolls at 20 px/s (`DEFAULT_SCROLL_SPEED_PX_S`)
 * do touchy release

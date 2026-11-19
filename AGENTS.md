@@ -60,15 +60,21 @@ just bump-version          # bump version, commit, tag, push
 - **Keep `touchy_pad` imports inside `display.py`, and lazy** (inside the
   functions). That is what lets the whole package + test suite run with no
   touchy-pad and no hardware.
-- **`touchy-pad` floor carries stage lb26** — the host API the display needs
+- **`touchy-pad` floor is 1.0.0** — the host API the display needs
   (`SetPropertiesCmd` / `build_property_override` + `Label.recolor` arrived in
   0.3.5; 0.3.8 added `Label.scroll_speed_px_s`, the marquee-speed knob
-  `display.py` uses to slow the scroll to `DEFAULT_SCROLL_SPEED_PX_S`; **lb26**,
-  released in 0.4.0, added `SetPropertyCmd.font_size_value` and
-  `FontSize` / `FONT_SIZES` — the runtime `text_font` override a long quip steps
-  down through). A host library older than lb26 sends that entry as an
-  `int_value`, which the lb26 firmware refuses (and pre-lb26 firmware would read
-  as a font pointer), so the floor is 0.4.0, the first release that carries it.
+  `display.py` uses to slow the scroll to `DEFAULT_SCROLL_SPEED_PX_S`; **lb26**
+  added `SetPropertyCmd.font_size_value` + `FontSize` / `FONT_SIZES` — the runtime
+  `text_font` override a long quip steps down through — and 1.0.0 is the release
+  that carries all of it *and* compiled the **24-px** Montserrat face, the
+  step-down's middle rung: `display.py`'s tiers are `8 / 16 / 24 / 30`, the host's
+  published set minus the 14-px theme default). A host library older than lb26
+  sends that entry as an `int_value`, which the lb26 firmware refuses (and
+  pre-lb26 firmware would read as a font pointer) — the quip still shows, at full
+  size. Keep `display.py`'s `FONT_SIZES` inside the host's: a size the device has
+  no font for makes `build_property_override` raise *host-side*, which surfaces as
+  a lost pad rather than a smaller font
+  (`test_the_tiers_are_sizes_the_firmware_compiles` is the guard).
   Older releases break the display path and its tests. To develop against
   upstream instead of PyPI, run `just use-touchy-local`: it clones or
   fast-forwards

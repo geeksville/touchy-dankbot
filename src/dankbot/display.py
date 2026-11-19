@@ -57,10 +57,15 @@ STARTUP_TEXT = "I'm dankbot"
 WHITE = 0xFFFFFF
 
 #: The label font sizes dankbot chooses between. The device renders only the
-#: fonts its build compiled: 8 (LVGL's UNSCII bitmap face), 14 (Montserrat, the
-#: theme default), 16 and 30. 14 is skipped on purpose — it is barely smaller
-#: than 16, and 16 is glass-clear where 14 is not. See ``docs/plans/quipfit.md``.
-FONT_SIZES = (8, 16, 30)
+#: fonts its build compiled: 8 (LVGL's UNSCII bitmap face — the one legible face
+#: on an 8-px matrix), 14 (Montserrat, the theme default), 16, 24 and 30. 14 is
+#: skipped on purpose — it is barely smaller than 16, and 16 is glass-clear where
+#: 14 is not — so dankbot's tiers are 8 / 16 / 24 / 30, the same set touchy-pad
+#: publishes as ``FONT_SIZES`` (1.0.0 grew it with the 24-px Montserrat face,
+#: ``CONFIG_LV_FONT_MONTSERRAT_24``). 24 is the step-down's **middle rung**: a
+#: quip too long for 30 px keeps a bigger, clearer font than the old 30 → 16
+#: jump. See ``docs/plans/quipfit.md``.
+FONT_SIZES = (8, 16, 24, 30)
 
 #: The LVGL style property that carries a label's font. An *int* value for this
 #: name means a pixel size: touchy-pad routes it to
@@ -180,7 +185,8 @@ def chars_that_fit(width: int, height: int, font: int) -> int:
 
     A rough, deliberately pessimistic estimate: the field's inner rectangle
     (:func:`panel_inset`) divided into glyph cells. It only has to be right about
-    *which* compiled font the quip needs, and the tiers are far apart (30 → 16).
+    *which* compiled font the quip needs, and the tiers are far apart
+    (30 → 24 → 16).
     """
     inset = panel_inset(height)
     cols = max(1, int((width - 2 * inset) // (font * GLYPH_ADVANCE_RATIO)))

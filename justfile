@@ -41,8 +41,10 @@ listen *args: install
 # `git checkout pyproject.toml poetry.lock`.
 
 # The published floor `use-touchy-pypi` restores. Keep it in step with the
-# `touchy-pad = ...` line in pyproject.toml (and the lb26 note there).
-touchy_pad_floor := ">=0.4.0"
+# `touchy-pad = ...` line in pyproject.toml (and the floor note there): 1.0.0 is
+# the release that has both the lb26 `text_font` override and the font set that
+# includes the 24-px tier `display.py` steps down through.
+touchy_pad_floor := ">=1.0.0"
 
 # Clone or fast-forward https://github.com/geeksville/touchy-pad.git into
 # reference/touchy-pad (git-ignored), generate the protobuf bindings upstream
@@ -82,8 +84,9 @@ use-touchy-local:
 
 # Point the touchy-pad dependency back at the published PyPI package (the default).
 # NB: the long-quip font step-down needs stage lb26 (`SetPropertyCmd.font_size_value`,
-# released as touchy-pad v0.4.0). On an older host library that entry goes out as an
-# `int_value`, which the lb26 firmware refuses — the quip still shows, at full size.
+# released as touchy-pad v0.4.0) *and* the 24-px tier the published font set grew in
+# 1.0.0. On an older host library that entry goes out as an `int_value`, which the
+# lb26 firmware refuses — the quip still shows, at full size.
 use-touchy-pypi:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -102,7 +105,7 @@ use-touchy-pypi:
     # `--no-cache` is the point of this recipe: Poetry caches PyPI's index for what
     # is effectively forever (the cache entries carry a ~317-year max-age), so a
     # release published minutes ago stays invisible to a cached resolve and the
-    # solver fails with "touchy-pad (>=0.4.0) ... doesn't match any versions" even
+    # solver fails with "touchy-pad (>=1.0.0) ... doesn't match any versions" even
     # though PyPI has it. Ask the index instead of the cache.
     if ! poetry lock --no-interaction --no-cache; then
         echo "use-touchy-pypi: cannot resolve touchy-pad {{touchy_pad_floor}} — is it on PyPI?" >&2
@@ -114,7 +117,7 @@ use-touchy-pypi:
     import pathlib
     import sys
     import tomllib
-    from touchy_pad.api import build_property_override
+    from touchy_pad.api import FONT_SIZES, build_property_override
     packages = tomllib.loads(pathlib.Path("poetry.lock").read_text())["package"]
     touchy = next(pkg for pkg in packages if pkg["name"] == "touchy-pad")
     if source := touchy.get("source"):
@@ -126,6 +129,10 @@ use-touchy-pypi:
     # that assert the smaller font fail). Say so rather than leave it a mystery.
     if build_property_override("dankbot", "text_font", 16).WhichOneof("value") != "font_size_value":
         print("note: this release predates stage lb26 (0.4.0) — the font step-down stays inert")
+    # …and the 24-px middle rung needs the font set 1.0.0 published: without it a
+    # 169–248-character quip steps straight past 24 to 16 px.
+    if 24 not in FONT_SIZES:
+        print("note: this release predates the 24-px tier (1.0.0) — the step-down skips it")
     PY
 
 # List the models the remote server has pulled.

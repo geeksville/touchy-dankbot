@@ -60,12 +60,16 @@ rich = ">=13.7"
 # release that carries the host API dankbot uses (`SetPropertiesCmd` /
 # `build_property_override` + `Label.recolor` from 0.3.5, and
 # `Label.scroll_speed_px_s` from 0.3.8, which sets the marquee speed) — anything
-# older breaks the display. The long-quip font step-down additionally needs
-# stage lb26 (`SetPropertyCmd.font_size_value`), which shipped in 0.4.0 — that is
-# the floor.
+# older breaks the display. The long-quip font step-down needs the lb26
+# `SetPropertyCmd.font_size_value` override and the published font set that
+# enumerates the sizes — 1.0.0 is the release that carries both, and the one that
+# compiled the 24-px Montserrat face display.py steps down through. That is the
+# floor: `src/dankbot/display.py`'s `FONT_SIZES` (8 / 16 / 24 / 30) must stay a
+# subset of the host's, or a tier a pad has no font for raises host-side and the
+# quip never draws.
 # `just use-touchy-local` swaps in a path dep against
 # a clone of upstream main (reference/touchy-pad/app) for host-library work.
-touchy-pad = ">=0.4.0"
+touchy-pad = ">=1.0.0"
 
 [tool.poetry.urls]
 Homepage = "https://github.com/geeksville/touchy-dankbot"
