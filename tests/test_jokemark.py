@@ -379,6 +379,33 @@ def test_render_writes_the_header_summary_and_one_section_per_model():
     assert cells[7:10] == ["1", "1", "1"]
 
 
+def test_the_summary_timing_ignores_each_banks_first_row():
+    # The first reply of a bank pays for loading the model, so it must not set
+    # the summary's median/slowest — a 2.7-minute cold start would otherwise
+    # read as "this model is slow". It is still reported per line as measured.
+    spec = ModelSpec(label="m", model="m")
+    times = (("cold", 162.5), ("a", 10.0), ("b", 12.0), ("c", 14.0))
+    rows = tuple(LineResult(line, _reply("quip"), seconds) for line, seconds in times)
+    md = _render([ModelResult(spec=spec, results=rows)], tuple(line for line, _ in times))
+
+    summary = next(line for line in md.splitlines() if line.startswith("| 1 | m |"))
+    cells = [cell.strip() for cell in summary.strip("|").split("|")]
+    assert cells[10:12] == ["12.0 s", "14.0 s"]  # median of 10/12/14; slowest 14
+    assert "| 1 | cold | quip | `quip` | 162.5 |" in md  # the raw row is kept
+    assert "ignore each bank's first row" in md  # …and the footnote says why
+
+
+def test_a_single_line_bank_still_reports_its_only_time():
+    # Nothing warm to fall back on: report the cold row rather than a dash.
+    spec = ModelSpec(label="m", model="m")
+    rows = (LineResult("a", _reply("quip"), 3.0),)
+    md = _render([ModelResult(spec=spec, results=rows)], ("a",))
+
+    summary = next(line for line in md.splitlines() if line.startswith("| 1 | m |"))
+    cells = [cell.strip() for cell in summary.strip("|").split("|")]
+    assert cells[10:12] == ["3.0 s", "3.0 s"]
+
+
 def test_render_marks_errors_and_lines_never_attempted():
     spec = ModelSpec(label="bad", model="m")
     results = [

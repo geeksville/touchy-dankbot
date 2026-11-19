@@ -70,6 +70,15 @@ REPORT_VERSION = 1
 #: How long ``--playback`` leaves a quip up on the pad before the next one.
 PLAYBACK_PAUSE_S = 5.0
 
+#: Rows at the head of each bank that the summary's *timing* columns ignore. The
+#: first reply of a bank pays for loading the model (a cold 12B can take
+#: minutes), which says nothing about how fast the model is once warm — left in,
+#: it would be the "slowest" row of every report. The row keeps its real latency
+#: in the detail table and the JSON sidecar; only the median/slowest aggregate
+#: skips it. A bank with a single row has nothing else to show, so that row is
+#: used anyway.
+WARMUP_ROWS = 1
+
 #: Keys a matrix entry may carry (``defaults`` may carry all but model/label).
 _ENTRY_KEYS = frozenset(
     {"model", "label", "temperature", "min_p", "ctx", "max_tokens", "native", "timeout"}
@@ -401,18 +410,40 @@ def _duration(seconds: Sequence[float], pick: Callable[[Sequence[float]], float]
     return f"{pick(seconds):.1f} s" if seconds else "—"
 
 
+def _warm_times(rows: Sequence[LineResult]) -> list[float]:
+    """The latencies behind the summary's timing columns — warm rows only.
+
+    The head of a bank is dropped (:data:`WARMUP_ROWS`): its latency is the
+    model's *load* time, not its speed. A bank with nothing but warmup rows
+    reports them rather than a dash — a cold number beats no number.
+    """
+    warm = rows[WARMUP_ROWS:] or rows
+    return [row.elapsed_s for row in warm]
+
+
 def _summary_row(index: int, result: ModelResult, line_count: int) -> str:
     spec = result.spec
     replies = sum(1 for row in result.results if row.reply is not None and not row.reply.skip)
     skips = sum(1 for row in result.results if row.reply is not None and row.reply.skip)
     errors = line_count - sum(1 for row in result.results if row.error is None)
-    times = [row.elapsed_s for row in result.results]
+    times = _warm_times(result.results)
     median = _duration(times, statistics.median)
     slowest = _duration(times, max)
     return (
         f"| {index} | {_cell(spec.label)} | {_cell(spec.model)} "
         f"| {spec.temperature:g} | {spec.min_p:g} | {spec.ctx} | {spec.max_tokens} "
         f"| {replies} | {skips} | {errors} | {median} | {slowest} |"
+    )
+
+
+def _timing_footnote() -> str:
+    """The line under the summary that says what the timing columns leave out."""
+    head = "row" if WARMUP_ROWS == 1 else f"{WARMUP_ROWS} rows"
+    return (
+        f"_`median` / `slowest` ignore each bank's first {head} — that reply pays "
+        "for loading the model, so it is not typical of its speed (a bank with a "
+        "single line has nothing else to show). The per-line `s` columns below are "
+        "the raw measurements, cold row included._"
     )
 
 
@@ -465,7 +496,7 @@ def render_markdown(
     ]
     for index, result in enumerate(results, 1):
         out.append(_summary_row(index, result, len(lines)))
-    out.append("")
+    out += ["", _timing_footnote(), ""]
 
     for index, result in enumerate(results, 1):
         spec = result.spec

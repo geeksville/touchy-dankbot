@@ -73,6 +73,14 @@ the bake-off never needs one.
 >   still the Rocinante Q4_K_M until the sweep says otherwise. The packaged
 >   matrix tests now assert the active sweep, and that every retired candidate
 >   is still *documented* in the raw text.
+> * **Warm timings (2026-11-18)** — the summary's `median` / `slowest` now ignore
+>   each bank's first row (`jokemark.WARMUP_ROWS`, 1): that reply carries the
+>   model's *load* time, so the Q4_K_M run's 162.5 s cold start made "slowest"
+>   useless (17.1 s median, 162.5 s slowest). The per-line `s` column still
+>   reports it — it is the raw measurement — a footnote under the summary says
+>   so, and a one-line bank falls back to its only row rather than a dash. The
+>   JSON sidecar is unchanged (it stores raw per-row latencies, no aggregates).
+>   Resolves the "cold-load latency pollutes the first rows" risk below.
 > * **JSON sidecar + playback (2026-11-17)** — every run now also writes
 >   `<out>.json` beside the Markdown (`jokemark.json` by default): the same
 >   data, versioned, with replies *untruncated* and their colour runs included
@@ -356,7 +364,9 @@ for spec in matrix:                      # matrix order, one model loaded at a t
   when the server has gone away.
 * **Latency is measured around `responder.respond`** and stored per reply —
   the report's summary shows the median and the slowest reply, which is the
-  number that matters for the 30 s budget in `initial.md`.
+  number that matters for the 30 s budget in `initial.md`. Both aggregates skip
+  each bank's first row (`jokemark.WARMUP_ROWS`): that reply pays for loading
+  the model, so it would otherwise be the "slowest" row of every report.
 * The persona is read once (file wins over flag, as in `reply`/`listen`) and
   its **first line plus SHA-256 prefix go into the report header**, so a
   persona edit cannot silently invalidate a comparison.
@@ -380,6 +390,8 @@ Server `https://kai.pygmy-map.ts.net` · corpus `overheard.txt` (36 lines)
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 1 | hermes-3-8b | hf.co/NousResearch/…:latest | 0.85 | 0.05 | 4096 | 120 | 31 | 5 | 0 | 0.9 s | 2.4 s |
 | 2 | human-like-nemo-12b | hf.co/bartowski/…:Q8_0 | 0.85 | 0.05 | 4096 | 120 | 28 | 8 | 0 | 2.1 s | 5.0 s |
+
+_`median` / `slowest` ignore each bank's first row — that reply pays for loading the model, so it is not typical of its speed (a bank with a single line has nothing else to show). The per-line `s` columns below are the raw measurements, cold row included._
 
 ## 1. hermes-3-8b
 
@@ -564,9 +576,14 @@ next default model without consulting shell history.
 * **Nondeterminism.** One sample per line at `temperature=0.85` means one run
   is a hint, not a verdict; the report says so and `repeats` is the follow-up
   if a close call needs settling.
-* **Cold-load latency pollutes the first rows.** The first reply after a pull
-  includes model load time. The per-row latency exposes it; a warm-up call per
-  model is tempting but would double cost — deferred, and the median is robust.
+* **Cold-load latency pollutes the first rows — resolved (2026-11-18).** The
+  first reply after a pull includes model load time, and in the Q4_K_M run it
+  was 162.5 s against a 17.1 s median, which made "slowest" useless. The per-row
+  latency still exposes it, but the summary's `median` / `slowest` now skip each
+  bank's first row (`jokemark.WARMUP_ROWS`) instead of being skewed by it, and a
+  footnote under the summary says so; a one-line bank falls back to its only row
+  rather than reporting a dash. A real warm-up call per model (which would
+  double the cost of a run) stays deferred.
 * **Report churn in git — resolved.** `jokemark.md` is a generated artifact and
   is gitignored; point `-o` at `docs/…` when a report is worth keeping as a
   dated baseline.

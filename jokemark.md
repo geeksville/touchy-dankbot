@@ -8,9 +8,11 @@ Server `http://localhost:11434` · corpus `overheard.txt` (36 lines)
 
 | # | label | model | temp | min-p | ctx | max | replies | skips | errors | median | slowest |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | rocinante-x-12b | hf.co/TheDrummer/Rocinante-X-12B-v1-GGUF:Q4_K_M | 0.85 | 0.05 | 4096 | 120 | 35 | 1 | 0 | 17.1 s | 162.5 s |
-| 2 | rocinante-x-12b q3_k_m | hf.co/TheDrummer/Rocinante-X-12B-v1-GGUF:Q3_K_M | 0.85 | 0.05 | 4096 | 120 | 36 | 0 | 0 | 14.4 s | 103.6 s |
-| 3 | rocinante-x-12b q2_k | hf.co/TheDrummer/Rocinante-X-12B-v1-GGUF:Q2_K | 0.85 | 0.05 | 4096 | 120 | 36 | 0 | 0 | 10.2 s | 158.5 s |
+| 1 | rocinante-x-12b | hf.co/TheDrummer/Rocinante-X-12B-v1-GGUF:Q4_K_M | 0.85 | 0.05 | 4096 | 120 | 35 | 1 | 0 | 17.0 s | 57.9 s |
+| 2 | rocinante-x-12b q3_k_m | hf.co/TheDrummer/Rocinante-X-12B-v1-GGUF:Q3_K_M | 0.85 | 0.05 | 4096 | 120 | 36 | 0 | 0 | 14.3 s | 44.1 s |
+| 3 | rocinante-x-12b q2_k | hf.co/TheDrummer/Rocinante-X-12B-v1-GGUF:Q2_K | 0.85 | 0.05 | 4096 | 120 | 36 | 0 | 0 | 10.2 s | 23.8 s |
+
+_`median` / `slowest` ignore each bank's first row — that reply pays for loading the model, so it is not typical of its speed (a bank with a single line has nothing else to show). The per-line `s` columns below are the raw measurements, cold row included._
 
 ## 1. rocinante-x-12b
 

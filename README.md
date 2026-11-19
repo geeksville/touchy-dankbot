@@ -169,7 +169,8 @@ dankbot jokemark --playback jokemark.json   # replay a saved run (no server)
   per-reply probing), so the bake-off never waits for hardware;
   `--display-mode` picks the layout.
 * **Reports:** one Markdown file with a summary table (replies / skips / errors /
-  median / slowest) and, per model, every line with the quip it produced, the
+  median / slowest — the two timing columns skip each bank's first, cold-load
+  row) and, per model, every line with the quip it produced, the
   raw output (commands visible) and the latency — plus a JSON sidecar
   (`<out>.json`, `jokemark.json` by default) with the same data, untruncated
   and including the colour runs. Both are generated artifacts.
