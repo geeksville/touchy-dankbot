@@ -36,6 +36,9 @@ tracked in git.
 - `docs/plans/latency.md` — reply latency instrumentation: split `latency_s`
   into `queue_wait_s` + `model_s` so a backlog is distinguishable from a slow
   model (log suffix, `--json`, DEBUG request sizes).
+- `docs/plans/rpi-service.md` — running `dankbot listen` as a systemd **user**
+  service (`rpi/user-service.sh`): autostart via linger, journald logging, and the
+  `DANKBOT_*` env file.
 
 Docs that are *not* plans: `docs/TODO.md` (loose backlog), `docs/hardware.md`
 (hardware notes), `docs/responder.md` / `docs/transcribe.md` (research notes).

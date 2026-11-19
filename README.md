@@ -262,6 +262,25 @@ model round trip.
 All the LLM flags (`--url` / `--model` / `--persona` / ...) are shared with
 `reply`.
 
+### Running it as a service
+
+On the Pi, `dankbot listen` can run as a systemd **user** service that comes up
+by itself after a reboot and keeps retrying until the mic and the server are
+there:
+
+```sh
+bash rpi/user-service.sh            # install + enable + start (autostarts at boot)
+bash rpi/user-service.sh logs       # tail the quips
+bash rpi/user-service.sh status     # restart / stop / uninstall / ...
+```
+
+Settings live in `~/.config/dankbot/listen.env` (`DANKBOT_*` overrides), and the
+logs — the quips plus the unit's own start/stop/exit events — go to the **journal**
+(`journalctl --user-unit=dankbot-listen -f`, or `user-service.sh logs`), which on
+a Pi is RAM-backed and size-capped instead of another file on the SD card. See
+[rpi/README.md](rpi/README.md) and
+[docs/plans/rpi-service.md](docs/plans/rpi-service.md).
+
 ## The display (on the touchy-pad)
 
 The display half: dankbot builds **one** label screen on a touchy-pad, then each

@@ -31,6 +31,7 @@ of the **creep3r** art project. This repo is standalone: it depends on the
 | `src/dankbot/assets/` | Packaged jokemark data: `overheard.txt` + `jokemark-models.toml` (read via `importlib.resources`). |
 | `tests/` | pytest (network-free; audio + touchy-pad are faked). |
 | `docs/` | `plans/` (design), `hardware.md`, `TODO.md`. |
+| `rpi/` | Raspberry Pi deploy: `install-rpi.sh` (apt / udev / groups), `user-service.sh` (the `dankbot listen` systemd **user** service), setup notes. |
 | `justfile` | All dev tasks — prefer `just <recipe>`. |
 | `.agents/skills/moonshine-voice/` | The Moonshine Voice SDK cheat-sheet. |
 | `.agents/skills/touchy-pad/` | The Touchy-Pad host SDK cheat-sheet (fetch the live `llms.txt` first). |

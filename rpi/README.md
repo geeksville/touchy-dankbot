@@ -38,6 +38,44 @@ bash rpi/install-rpi.sh
 
 just test
 
+## running as a service (autostart on boot)
+
+`rpi/user-service.sh` installs `dankbot listen` as a systemd **user** service and
+drives it:
+
+```bash
+bash rpi/user-service.sh              # install: unit + env file, enable + start
+bash rpi/user-service.sh status
+bash rpi/user-service.sh logs         # tail the quips
+bash rpi/user-service.sh restart
+bash rpi/user-service.sh stop
+bash rpi/user-service.sh uninstall
+```
+
+* **Runs as your login user**, so it inherits the `audio` / `plugdev` / `dialout`
+  access `rpi/install-rpi.sh` grants that account — run that first, and log out
+  and back in once so the group changes apply.
+* **Autostarts at boot** with nobody logged in: `install` enables linger
+  (`loginctl enable-linger $USER`). If it cannot (polkit / sudo), it prints the
+  command to run by hand.
+* **Logs** go to the **journal** (systemd's default), not to a file: on Raspberry
+  Pi OS journald keeps its storage in RAM (`/run/log/journal`), so it is wiped at
+  reboot, size-capped by journald itself, and writes nothing to the SD card once
+  the root filesystem goes read-only. The `HEARD` / `SKIP(...)` / `REPLY:` lines
+  (with their `[HH:MM:SS]` stamps) and the unit's own start/stop/exit events are
+  all in one stream — `user-service.sh logs`, i.e.
+  `journalctl --user-unit=dankbot-listen -f`.
+* **Settings**: `~/.config/dankbot/listen.env` holds `DANKBOT_*` overrides
+  (`DANKBOT_URL`, `DANKBOT_MODEL`, `DANKBOT_DEBUG`, ...) — the same
+  flag → env → default rule as everywhere else. Edit it, then
+  `user-service.sh restart`.
+* The unit retries every 5 s after a failure, so a mic plugged in *after* boot
+  brings the ears up with no manual start.
+
+The model the service uses has to be on the server: either `ollama pull <model>`
+first, or let the first start fetch it (pulling is on by default). The reasoning
+is in `docs/plans/rpi-service.md`.
+
 ollama run hf.co/bartowski/Hermes-3-Llama-3.2-3B-GGUF # fast ehough to use - actually seems a little funnier than the bigger nemo
 ollama ps
 NAME                                                 ID              SIZE      PROCESSOR    CONTEXT    RUNNER  UNTIL              
