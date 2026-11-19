@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import types
 
 import pytest
 
@@ -130,3 +131,39 @@ def test_ensure_model_survives_a_failed_fetch(monkeypatch, caplog):
     with caplog.at_level(logging.WARNING, logger="dankbot.server"):
         assert client.ensure_model("a") is False
     assert "could not fetch a: no such model" in caplog.text
+
+
+# -- chat instrumentation: what we send, and for how long ---------------------
+
+
+def test_chat_logs_the_prompt_and_reply_sizes_at_debug(monkeypatch, caplog):
+    client = ChatClient(Settings())
+    monkeypatch.setattr(client, "_chat_openai", lambda messages: "a quip")
+    with caplog.at_level(logging.DEBUG, logger="dankbot.server"):
+        assert client.chat([{"role": "user", "content": "hello there"}]) == "a quip"
+    assert "11 prompt chars (11 heard)" in caplog.text
+    assert "6 reply chars" in caplog.text
+
+
+def test_chat_closes_the_openai_client_it_built(monkeypatch):
+    """A client per request must be closed, or a long listen session leaks it."""
+    closed: list[bool] = []
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            message = types.SimpleNamespace(content="a quip")
+            return types.SimpleNamespace(choices=[types.SimpleNamespace(message=message)])
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.chat = types.SimpleNamespace(completions=FakeCompletions())
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            closed.append(True)
+
+    monkeypatch.setattr("dankbot.server.OpenAI", FakeClient)
+    assert ChatClient(Settings()).chat([{"role": "user", "content": "hi"}]) == "a quip"
+    assert closed == [True]

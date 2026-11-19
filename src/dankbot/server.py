@@ -15,6 +15,8 @@ Every failure — bad URL, timeout, HTTP error — is normalised to
 from __future__ import annotations
 
 import logging
+import os
+import time
 
 import requests
 from openai import OpenAI
@@ -27,6 +29,19 @@ log = logging.getLogger(__name__)
 def _strip_latest(name: str) -> str:
     """``foo:latest`` → ``foo`` — Ollama adds the tag when a pull omits it."""
     return name.removesuffix(":latest")
+
+
+def _open_fds() -> int | None:
+    """The process's open file descriptors, when the OS can tell us.
+
+    A cheap leak gauge for the DEBUG chat line: one socket per request that is
+    never closed shows up here as a count that only climbs. ``None`` off Linux
+    (or with ``/proc`` hidden) — the gauge is optional, never fatal.
+    """
+    try:
+        return len(os.listdir("/proc/self/fd"))
+    except OSError:  # pragma: no cover - not Linux
+        return None
 
 
 class DankbotError(RuntimeError):
@@ -44,26 +59,48 @@ class ChatClient:
     # -- chat --------------------------------------------------------------
 
     def chat(self, messages: list[dict[str, str]]) -> str:
-        """Return the assistant text for *messages* (OpenAI chat shape)."""
+        """Return the assistant text for *messages* (OpenAI chat shape).
+
+        Logs the sizes and the round-trip time at DEBUG — the companion to the
+        listen loop's latency split: it shows the *prompt* (so an unexpectedly
+        empty or growing request is visible) and the process's open file
+        descriptors, which is where a leaked connection would show up.
+        """
+        heard = messages[-1].get("content", "") if messages else ""
+        started = time.monotonic()
         if self._s.native:
-            return self._chat_native(messages)
-        return self._chat_openai(messages)
+            text = self._chat_native(messages)
+        else:
+            text = self._chat_openai(messages)
+        fds = _open_fds()
+        log.debug(
+            "chat: %d prompt chars (%d heard) → %d reply chars in %.2fs%s",
+            sum(len(message.get("content", "")) for message in messages),
+            len(heard),
+            len(text),
+            time.monotonic() - started,
+            "" if fds is None else f" [fds={fds}]",
+        )
+        return text
 
     def _chat_openai(self, messages: list[dict[str, str]]) -> str:
-        client = OpenAI(
-            base_url=f"{self._s.url}/v1",
-            api_key="ollama",  # required by the SDK; ignored by Ollama
-            timeout=self._s.timeout,
-        )
+        # One client per request (the CLI builds a ChatClient per command), so
+        # close it: an unclosed OpenAI holds an httpx connection pool, and a
+        # long listen session would churn sockets it never releases.
         try:
-            resp = client.chat.completions.create(
-                model=self._s.model,
-                messages=messages,
-                temperature=self._s.temperature,
-                max_tokens=self._s.max_tokens,
-                # Ollama forwards these; non-Ollama servers ignore them.
-                extra_body={"options": {"min_p": self._s.min_p, "num_ctx": self._s.ctx}},
-            )
+            with OpenAI(
+                base_url=f"{self._s.url}/v1",
+                api_key="ollama",  # required by the SDK; ignored by Ollama
+                timeout=self._s.timeout,
+            ) as client:
+                resp = client.chat.completions.create(
+                    model=self._s.model,
+                    messages=messages,
+                    temperature=self._s.temperature,
+                    max_tokens=self._s.max_tokens,
+                    # Ollama forwards these; non-Ollama servers ignore them.
+                    extra_body={"options": {"min_p": self._s.min_p, "num_ctx": self._s.ctx}},
+                )
         except Exception as exc:
             raise DankbotError(f"{type(exc).__name__}: {exc}") from exc
         return resp.choices[0].message.content or ""

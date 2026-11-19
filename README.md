@@ -216,15 +216,20 @@ Those log lines go to **stderr** and are rendered with
 [`rich`](https://rich.readthedocs.io): `HEARD:` / `SKIP(...)` / `REPLY:` each get
 their own colour, and the `REPLY:` line prints the quip **in the same colours the
 display scrolls** for it (see [`src/dankbot/logs.py`](src/dankbot/logs.py)) — so
-a colour reply is visible without the pad. A pipe or `NO_COLOR` falls back to
-plain text, and the message text itself is unchanged.
+a colour reply is visible without the pad. Every line leads with a local
+`[HH:MM:SS]` stamp (handy for watching latency drift over a long session). A
+pipe or `NO_COLOR` falls back to plain text, and the message text itself is
+unchanged.
 
 Every `REPLY:` line also ends with the **pipeline latency** — the wall time from
 the utterance arriving to the quip being ready, so it covers both the wait
 behind a busy reply worker *and* the model round trip: `REPLY: … (45s latency)`.
-A `/notfunny` skip reports it too (it made the same round trip); a gate `SKIP`
-never reached the model, so it has none. `--json` carries the same number as
-`latency_s`.
+Once the utterance actually waited in the reply queue the suffix splits the
+figure — `REPLY: … (45s latency: 30s queue + 15s model)` — which is what tells a
+pipeline falling behind from a model that has got slow (the two want different
+fixes). A `/notfunny` skip reports the same timing; a gate `SKIP` never reached
+the model, so it has none. `--json` carries the total as `latency_s` and the
+parts as `queue_wait_s` / `model_s`.
 
 The microphone is **supervised**: `dankbot listen` watches its PortAudio capture
 stream and, if the array goes away (unplugging the USB cable), re-opens it — so

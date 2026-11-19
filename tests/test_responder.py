@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from dankbot.commands import COLOURS, WHITE, Run
 from dankbot.responder import Reply, Responder
 
@@ -66,3 +68,19 @@ def test_as_dict_json_shape():
         "model": "m",
         "raw": "",
     }
+
+
+def test_respond_warns_when_asked_about_an_empty_line(caplog):
+    """The gate should make this unreachable — say so loudly if it ever is not."""
+    responder = Responder(_chat_returning("Time to toast!"), model="m")
+    with caplog.at_level(logging.WARNING, logger="dankbot.responder"):
+        responder.respond("   ")
+    assert "empty line" in caplog.text
+
+
+def test_respond_logs_the_round_trip_size_at_debug(caplog):
+    responder = Responder(_chat_returning("Time to toast!"), model="m")
+    with caplog.at_level(logging.DEBUG, logger="dankbot.responder"):
+        responder.respond("the bread is done baking")
+    assert "24 chars in" in caplog.text
+    assert "14 chars out" in caplog.text

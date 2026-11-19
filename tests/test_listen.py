@@ -6,7 +6,7 @@ import json
 import threading
 import time
 
-from dankbot.audio import FakeTranscriptSource
+from dankbot.audio import FakeTranscriptSource, Utterance
 from dankbot.gate import UtteranceGate
 from dankbot.listen import (
     KIND_HEARD,
@@ -14,6 +14,7 @@ from dankbot.listen import (
     KIND_SKIP,
     Listener,
     ListenEvent,
+    _Pending,
     json_emitter,
 )
 from dankbot.responder import Responder
@@ -123,7 +124,17 @@ def test_a_failing_reply_does_not_kill_the_loop():
 
 
 def test_json_emitter_shape(capsys):
-    json_emitter(ListenEvent(KIND_REPLY, text="a", reply="b", model="m", latency_s=45.234))
+    json_emitter(
+        ListenEvent(
+            KIND_REPLY,
+            text="a",
+            reply="b",
+            model="m",
+            latency_s=45.234,
+            queue_wait_s=30.0,
+            model_s=15.234,
+        )
+    )
     assert json.loads(capsys.readouterr().out) == {
         "event": "reply",
         "heard": "a",
@@ -131,12 +142,17 @@ def test_json_emitter_shape(capsys):
         "reason": "",
         "model": "m",
         "latency_s": 45.23,
+        "queue_wait_s": 30.0,
+        "model_s": 15.23,
     }
 
 
 def test_json_reports_no_latency_before_the_model_has_answered(capsys):
     json_emitter(ListenEvent(KIND_HEARD, text="a"))
-    assert json.loads(capsys.readouterr().out)["latency_s"] is None
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["latency_s"] is None
+    assert payload["queue_wait_s"] is None
+    assert payload["model_s"] is None
 
 
 def test_events_are_logged_by_default(caplog):
@@ -233,3 +249,53 @@ def test_latency_counts_the_wait_behind_a_busy_reply_queue():
     latency = {e.text: e.latency_s for e in events if e.kind == KIND_REPLY}
     assert latency["alpha one two"] >= 0.1  # its own slow model
     assert latency["charlie one two"] >= 0.09  # queued behind it, not its own model
+
+
+def test_a_queued_reply_splits_its_latency_into_wait_and_model():
+    """The split is the point: a backlog is `queue_wait_s`, a slow model is `model_s`."""
+
+    def chat(messages):
+        if messages[-1]["content"] == "alpha one two":
+            time.sleep(0.1)  # one slow reply, so the next one has to wait for the worker
+        return "ok"
+
+    events, emit = _collector()
+    listener = Listener(
+        Responder(chat, model="m"), UtteranceGate(min_words=1), emit=emit, max_queued=4
+    )
+    listener.run(FakeTranscriptSource(["alpha one two", "charlie one two"]))
+    replies = {e.text: e for e in events if e.kind == KIND_REPLY}
+    first, second = replies["alpha one two"], replies["charlie one two"]
+    # The first is (almost) all model; the second is (almost) all wait.
+    assert first.model_s >= 0.1
+    assert first.queue_wait_s < 0.05
+    assert second.queue_wait_s >= 0.09
+    assert second.model_s < 0.05
+    for event in (first, second):  # the parts add up to the whole
+        assert event.latency_s >= event.queue_wait_s + event.model_s - 0.01
+
+
+def test_a_notfunny_skip_carries_the_same_split():
+    def chat(messages):
+        time.sleep(0.05)
+        return "/notfunny"
+
+    events, emit = _collector()
+    listener = Listener(
+        Responder(chat, model="m"), UtteranceGate(min_words=1), emit=emit, inline=True
+    )
+    listener.run(FakeTranscriptSource(["nothing to see here"]))
+    skip = next(e for e in events if e.kind == KIND_SKIP)
+    assert skip.queue_wait_s is not None
+    assert skip.model_s >= 0.05
+
+
+def test_a_full_reply_queue_logs_the_utterance_it_drops(caplog):
+    import logging
+
+    listener = Listener(_responder(), UtteranceGate(min_words=1), emit=lambda e: None, max_queued=1)
+    listener._submit(_Pending(Utterance("alpha one two"), time.monotonic()))
+    with caplog.at_level(logging.DEBUG, logger="dankbot.listen"):
+        listener._submit(_Pending(Utterance("bravo one two"), time.monotonic()))
+    assert "dropped the stale utterance 'alpha one two'" in caplog.text
+    assert listener._queue.get_nowait().utterance.text == "bravo one two"

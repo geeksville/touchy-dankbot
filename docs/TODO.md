@@ -1,4 +1,5 @@
 misc
+* !investigate growing `listen` latency - instrumented: `REPLY:` suffix splits queue wait vs model time (`docs/plans/latency.md`); read a real run to see which term climbs
 * !fix scrolling rate - done: touchy-pad LB19 `scroll_speed_px_s`, dankbot scrolls at 20 px/s (`DEFAULT_SCROLL_SPEED_PX_S`)
 * do touchy release
 * !use funnier model - done: `DEFAULT_MODEL` is Rocinante-X 12B Q4_K_M (jokemark pick)

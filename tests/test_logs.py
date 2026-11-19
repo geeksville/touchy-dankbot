@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Callable
 
 import pytest
@@ -14,6 +15,9 @@ from dankbot.commands import COLOURS, WHITE, Run
 from dankbot.listen import KIND_REPLY, ListenEvent, log_emitter
 
 TEST_LOGGER = "dankbot.test_logs"
+
+#: ``[16:00:35]`` — the leading stamp every line carries (see ``logs.TIME_FORMAT``).
+STAMP = re.compile(r"\[\d{2}:\d{2}:\d{2}\]")
 
 
 @pytest.fixture
@@ -85,6 +89,27 @@ def test_a_skip_line_carries_a_latency_only_when_the_model_ran():
     )
 
 
+def test_the_latency_suffix_splits_a_queue_wait_from_the_model_time():
+    """A backlog and a slow model are different numbers — the log says which."""
+    line = logs.reply_line((Run("Danger", COLOURS["red"]),), latency_s=45.2, queue_wait_s=30.0)
+    assert str(line) == "REPLY: Danger (45s latency: 30s queue + 15s model)"
+    assert line.spans[-1].style == logs.DIM_STYLE  # still just metadata
+    assert str(logs.skip_line("notfunny", "meh", latency_s=12.0, queue_wait_s=9.0)) == (
+        "SKIP(notfunny): meh (12s latency: 9.0s queue + 3.0s model)"
+    )
+
+
+def test_a_negligible_queue_wait_keeps_the_short_latency_suffix():
+    """With no real queue the whole figure *is* the model time, so no breakdown."""
+    runs = (Run("Danger", COLOURS["red"]),)
+    assert str(logs.reply_line(runs, latency_s=45.2, queue_wait_s=0.0)) == (
+        "REPLY: Danger (45s latency)"
+    )
+    assert str(logs.reply_line(runs, latency_s=45.2, queue_wait_s=logs.QUEUE_WAIT_EPS / 2)) == (
+        "REPLY: Danger (45s latency)"
+    )
+
+
 def test_the_playback_line_keeps_the_context_and_the_quip():
     line = logs.playback_line("one", "the light is red", (Run("Danger", COLOURS["red"]),))
     assert str(line) == "one · the light is red → REPLY: Danger"
@@ -111,6 +136,30 @@ def test_plain_records_are_rendered_with_the_logger_name(console):
 def test_square_brackets_in_a_quip_stay_literal(console):
     plain, _ = _emit(console, lambda logger: logger.info(logs.reply_line((Run("[red]hi", WHITE),))))
     assert "[red]hi" in plain
+
+
+# -- the timestamp every line leads with --------------------------------------
+
+
+def _record(message: str, *, created: float) -> logging.LogRecord:
+    """A record with a fixed clock, so the rendered stamp is deterministic."""
+    record = logging.LogRecord(TEST_LOGGER, logging.INFO, __file__, 1, message, None, None)
+    record.created = created
+    return record
+
+
+def test_every_log_line_leads_with_a_time_stamp(console):
+    plain, _ = _emit(console, lambda logger: logger.info(logs.heard_line("the bread is done")))
+    assert STAMP.match(plain), plain  # the stamp is the first thing on the line
+    assert re.search(rf"{STAMP.pattern} INFO\s+{TEST_LOGGER}: HEARD: the bread is done", plain)
+
+
+def test_a_stamp_is_repeated_even_within_the_same_second(console):
+    """A blank stamp on the second of a HEARD/REPLY pair reads like a bug."""
+    handler = logs.make_handler(level=logging.INFO, console=console)
+    handler.handle(_record("first", created=1_700_000_000.0))
+    handler.handle(_record("second", created=1_700_000_000.0))
+    assert len(STAMP.findall(console.export_text(styles=False))) == 2
 
 
 def test_the_listen_emitter_logs_the_quip_as_colour_runs(caplog):
@@ -144,6 +193,24 @@ def test_the_listen_emitter_reports_a_reply_latency(caplog):
     with caplog.at_level(logging.INFO, logger="dankbot.listen"):
         log_emitter(event)
     assert caplog.records[-1].getMessage() == "REPLY: Danger ahead (45s latency)"
+
+
+def test_the_listen_emitter_reports_the_latency_split(caplog):
+    event = ListenEvent(
+        KIND_REPLY,
+        text="the light is red",
+        reply="Danger ahead",
+        model="m",
+        runs=(Run("Danger", COLOURS["red"]), Run(" ahead", WHITE)),
+        latency_s=45.2,
+        queue_wait_s=30.0,
+        model_s=15.2,
+    )
+    with caplog.at_level(logging.INFO, logger="dankbot.listen"):
+        log_emitter(event)
+    assert caplog.records[-1].getMessage() == (
+        "REPLY: Danger ahead (45s latency: 30s queue + 15s model)"
+    )
 
 
 def test_configure_installs_one_handler(monkeypatch):

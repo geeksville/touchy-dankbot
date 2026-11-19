@@ -88,7 +88,10 @@ just bump-version          # bump version, commit, tag, push
   `docs/plans/micreconnect.md`.
 - **Logging:** `logging.getLogger(__name__)`; `cli.main` calls `logs.configure()`
   (a rich handler on stderr — colour only on a terminal, so pipes and `--json`
-  stay clean). Every command takes `--debug` / `DANKBOT_DEBUG`, whose click
+  stay clean). Every line leads with a local `logs.TIME_FORMAT` stamp
+  (`[16:00:35]`), repeated even within the same second
+  (`omit_repeated_times=False`), so a latency that drifts is visible. Every
+  command takes `--debug` / `DANKBOT_DEBUG`, whose click
   callback calls `logs.enable_debug()` to drop the root and `dankbot` loggers
   to `DEBUG`; the commands raise `dankbot` to INFO with
   `logs.ensure_verbosity()` (never quieter), so `--debug` survives. The listen
@@ -97,7 +100,10 @@ just bump-version          # bump version, commit, tag, push
   text (`REPLY: …`, `SKIP(too_short): …`) intact — `grep` and `caplog` rely on
   it. A reply (and a `/notfunny` skip) appends the pipeline latency as a dim
   `(45s latency)` suffix — `Listener._answer` measures the wait plus the model
-  round trip; keep the suffix *after* the plain text. High-frequency RPC-ish
+  round trip, and reports them **split** (`queue_wait_s` / `model_s`, summed by
+  `latency_s`); the suffix grows to `(45s latency: 30s queue + 15s model)` once
+  the queue wait is real, so a backlog is distinguishable from a slow model.
+  Keep the suffix *after* the plain text. High-frequency RPC-ish
   lines go on a child logger.
 - **The `/command` contract** lives in `commands.py`; recognised commands are
   stripped from every displayed/printed reply (unknown slash tokens are recovered

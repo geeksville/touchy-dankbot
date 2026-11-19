@@ -31,6 +31,11 @@ tracked in git.
   overheard corpus × TOML model matrix → one Markdown report.
 - `docs/plans/modelpull.md` — auto-pull: `reply` / `listen` fetch a model the
   server does not have yet (`ensure_model`, `--pull/--no-pull`).
+- `docs/plans/micreconnect.md` — supervised capture: poll the PortAudio stream
+  and re-open the mic when the array goes away.
+- `docs/plans/latency.md` — reply latency instrumentation: split `latency_s`
+  into `queue_wait_s` + `model_s` so a backlog is distinguishable from a slow
+  model (log suffix, `--json`, DEBUG request sizes).
 
 Docs that are *not* plans: `docs/TODO.md` (loose backlog), `docs/hardware.md`
 (hardware notes), `docs/responder.md` / `docs/transcribe.md` (research notes).

@@ -8,10 +8,14 @@ without looking at the pad.
 Only the *presentation* changes. Every record's message is still the plain
 ``REPLY: Danger ahead`` / ``SKIP(too_short): uh`` / ``HEARD: …`` text, so
 ``--json`` consumers, ``grep`` and ``caplog`` are unaffected — and rich drops
-the colours by itself when the output is a pipe or ``NO_COLOR`` is set. The one
-addition is the pipeline latency a reply can carry, as a dim suffix that reads
-as metadata rather than as part of the quip: ``REPLY: Danger ahead (45s
-latency)`` (see :func:`format_latency`).
+the colours by itself when the output is a pipe or ``NO_COLOR`` is set. Each
+line also leads with a local :data:`TIME_FORMAT` stamp (``[16:00:35]``), which
+is what makes a latency that drifts over a long session visible. The one
+addition to the message itself is the pipeline latency a reply can carry, as a
+dim suffix that reads as metadata rather than as part of the quip: ``REPLY:
+Danger ahead (45s latency)``, or ``… (45s latency: 30s queue + 15s model)`` once
+the utterance actually waited in the reply queue (see :func:`format_latency` and
+:data:`QUEUE_WAIT_EPS`).
 
 The pieces:
 
@@ -73,10 +77,30 @@ def format_latency(seconds: float) -> str:
     return f"{seconds:.1f}s" if seconds < 10 else f"{seconds:.0f}s"
 
 
-def _append_latency(line: Text, latency_s: float | None) -> None:
-    """Add `` (45s latency)`` when there is one — dim, so it reads as metadata."""
-    if latency_s is not None:
-        line.append(f" ({format_latency(latency_s)} latency)", style=DIM_STYLE)
+#: A reply-queue wait below this is scheduling jitter, not a backlog: the timing
+#: suffix stays the short ``(45s latency)`` form, because with no queue the whole
+#: figure is the model round trip anyway (see :func:`_append_latency`).
+QUEUE_WAIT_EPS = 0.05
+
+
+def _append_latency(line: Text, latency_s: float | None, queue_wait_s: float | None = None) -> None:
+    """Add the timing suffix — dim, so it reads as metadata.
+
+    ``(45s latency)`` normally. When the utterance actually waited in the reply
+    queue the suffix splits the number, ``(45s latency: 30s queue + 15s model)``
+    — which is what tells a backed-up pipeline from a slow model. With no real
+    queue wait the whole figure *is* the model time, so the short form already
+    says it and the breakdown would only add noise (``--fake``, a fast reply).
+    """
+    if latency_s is None:
+        return
+    suffix = f" ({format_latency(latency_s)} latency"
+    if queue_wait_s is not None and queue_wait_s >= QUEUE_WAIT_EPS:
+        # The model time is derived rather than measured here, so clamp it: the
+        # two clocks can disagree by a tick on a fast path.
+        model_s = max(0.0, latency_s - queue_wait_s)
+        suffix += f": {format_latency(queue_wait_s)} queue + {format_latency(model_s)} model"
+    line.append(suffix + ")", style=DIM_STYLE)
 
 
 def heard_line(text: str) -> Text:
@@ -87,32 +111,45 @@ def heard_line(text: str) -> Text:
     return line
 
 
-def skip_line(reason: str, text: str, latency_s: float | None = None) -> Text:
+def skip_line(
+    reason: str,
+    text: str,
+    latency_s: float | None = None,
+    queue_wait_s: float | None = None,
+) -> Text:
     """``SKIP(<reason>): <text>`` — an utterance that never got a quip.
 
     *latency_s* is set only for a skip the *model* decided (``/notfunny``): it
     made the same round trip as a reply, so it reports the same timing. A gate
-    skip never reached the model and has none.
+    skip never reached the model and has none. *queue_wait_s* splits that timing
+    (see :func:`_append_latency`).
     """
     line = Text()
     line.append("SKIP", style=SKIP_STYLE)
     line.append(f"({reason}): ", style=DIM_STYLE)
     line.append(text, style=DIM_STYLE)
-    _append_latency(line, latency_s)
+    _append_latency(line, latency_s, queue_wait_s)
     return line
 
 
-def reply_line(runs: Sequence[Run], text: str = "", latency_s: float | None = None) -> Text:
+def reply_line(
+    runs: Sequence[Run],
+    text: str = "",
+    latency_s: float | None = None,
+    queue_wait_s: float | None = None,
+) -> Text:
     """``REPLY: <quip>`` — the quip in the colours the display will scroll.
 
     *text* is the fallback when there are no runs (the plain, command-free text).
     *latency_s* appends the pipeline latency (utterance heard → quip ready) as a
-    dim suffix, so a slow or backed-up model stage is visible in the log.
+    dim suffix, so a slow or backed-up model stage is visible in the log;
+    *queue_wait_s* splits it into the wait behind the reply worker and the model
+    round trip (see :func:`_append_latency`).
     """
     line = Text()
     line.append("REPLY: ", style=REPLY_STYLE)
     line.append_text(runs_text(runs) if runs else Text(text))
-    _append_latency(line, latency_s)
+    _append_latency(line, latency_s, queue_wait_s)
     return line
 
 
@@ -156,17 +193,29 @@ class _Handler(RichHandler):
         return line
 
 
+#: The timestamp each line leads with. Local time, to the second — enough to
+#: watch latency drift over a long ``dankbot listen`` session without the noise
+#: of a date on every line. Swap for ``"[%x %X]"`` to add the day.
+TIME_FORMAT = "[%H:%M:%S]"
+
+
 def make_handler(*, level: int = logging.NOTSET, console: Console | None = None) -> logging.Handler:
     """The rich handler — stderr by default, so stdout stays pipeable/``--json``.
 
     *level* defaults to ``NOTSET``: as with ``basicConfig``, it is the *root
     logger's* level (set by :func:`configure`) that decides what is emitted, so a
     ``dankbot`` logger raised to INFO (``dankbot listen``) still gets through.
+    Every line is stamped with :data:`TIME_FORMAT`, and the stamp is repeated
+    even on consecutive records in the same second (``omit_repeated_times`` off)
+    — a blank timestamp on the second of a ``HEARD``/``REPLY`` pair reads like a
+    missing field.
     """
     return _Handler(
         level=level,
         console=console or Console(stderr=True),
-        show_time=False,
+        show_time=True,
+        log_time_format=TIME_FORMAT,
+        omit_repeated_times=False,
         show_path=False,
         rich_tracebacks=True,
         # A quip may legitimately contain ``[...]``; never read it as markup.

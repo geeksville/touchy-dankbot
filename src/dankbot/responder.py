@@ -11,11 +11,15 @@ The model's raw output is run through the :mod:`dankbot.commands` parser, so a
 
 from __future__ import annotations
 
+import logging
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from .commands import Run, parse
 from .persona import DEFAULT_PERSONA
+
+log = logging.getLogger(__name__)
 
 #: ``messages -> assistant text``. ``messages`` is the OpenAI chat shape.
 ChatFn = Callable[[list[dict[str, str]]], str]
@@ -71,8 +75,25 @@ class Responder:
         ]
 
     def respond(self, line: str) -> Reply:
-        """Ask for a reply to *line* and parse its commands + colour runs."""
+        """Ask for a reply to *line* and parse its commands + colour runs.
+
+        Logs the round trip at DEBUG — the prompt and reply sizes plus the time
+        the chat call took — which is what shows *what* is being sent (and, via
+        the sizes, whether anything is growing) when the listen latency climbs.
+        """
+        if not line.strip():
+            # Unreachable in practice — ``AudioIn._on_line`` drops blank lines
+            # and the gate needs content words — but an empty prompt is the one
+            # input that silently burns a whole round trip, so never guess.
+            log.warning("asked the model about an empty line")
+        started = time.monotonic()
         raw = self._chat(self.messages_for(line)).strip()
+        log.debug(
+            "model round trip: %d chars in → %d chars out in %.2fs",
+            len(line),
+            len(raw),
+            time.monotonic() - started,
+        )
         parsed = parse(raw)
         return Reply(
             source=line,

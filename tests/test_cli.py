@@ -337,6 +337,27 @@ def test_listen_logs_heard_and_reply(monkeypatch, tmp_path, caplog):
     assert "REPLY: Time to toast!" in caplog.text
 
 
+def test_listen_debug_surfaces_the_round_trip_instrumentation(monkeypatch, tmp_path, caplog):
+    """``--debug`` is what shows *what* we send to the model, and how big."""
+    import logging
+
+    _use_fake(monkeypatch, {"the bread is done baking": "Time to toast!"})
+    lines = tmp_path / "overheard.txt"
+    lines.write_text("the bread is done baking\n")
+    # --debug lowers the root/dankbot loggers for the rest of the process, so
+    # put them back (the other --debug tests do the same).
+    root, dankbot = logging.getLogger(), logging.getLogger("dankbot")
+    saved = root.level, dankbot.level
+    try:
+        with caplog.at_level(logging.DEBUG, logger="dankbot"):
+            result = CliRunner().invoke(cli.main, ["listen", "--fake", str(lines), "--debug"])
+    finally:
+        root.setLevel(saved[0])
+        dankbot.setLevel(saved[1])
+    assert result.exit_code == 0
+    assert "model round trip: 24 chars in → 14 chars out" in caplog.text
+
+
 # -- jokemark -----------------------------------------------------------------
 
 

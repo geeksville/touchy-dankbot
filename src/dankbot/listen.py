@@ -15,9 +15,12 @@ Every reply also carries its **pipeline latency**: the wall time from the
 utterance arriving here to the quip being ready. That is the reply-queue wait
 (it is a one-deep queue on a worker thread, so a slow model backs it up) plus
 the model round trip — which is exactly what you want when asking "how far
-behind is the machine?". The log line shows it (``REPLY: … (45s latency)``) and
-``--json`` reports it as ``latency_s``. A *gate* skip never reached the model,
-so it has no latency; a ``/notfunny`` skip does, and says so.
+behind is the machine?". Because a single number cannot say *which* of the two
+is growing, it is reported split: ``latency_s`` is the total, and
+``queue_wait_s`` / ``model_s`` are the parts (the log shows the breakdown once
+the queue wait is real — ``REPLY: … (45s latency: 30s queue + 15s model)``).
+A *gate* skip never reached the model, so it has no latency; a ``/notfunny``
+skip does, and says so.
 
 See ``docs/plans/audioin.md`` and ``docs/plans/ledout.md``.
 """
@@ -62,6 +65,13 @@ class ListenEvent:
     #: reply-queue wait plus the model round trip. ``None`` for ``HEARD`` and
     #: for a gate ``SKIP``, which never reached the responder.
     latency_s: float | None = None
+    #: The part of :attr:`latency_s` spent waiting for the reply worker (i.e.
+    #: how far behind the talk the machine is). Set together with
+    #: :attr:`model_s` whenever the model ran; ``None`` otherwise.
+    queue_wait_s: float | None = None
+    #: The part of :attr:`latency_s` the model round trip itself took. The two
+    #: parts are what tell a backed-up queue from a slow model.
+    model_s: float | None = None
 
     def as_dict(self) -> dict[str, object]:
         """The ``--json`` shape."""
@@ -72,6 +82,8 @@ class ListenEvent:
             "reason": self.reason,
             "model": self.model,
             "latency_s": None if self.latency_s is None else round(self.latency_s, 2),
+            "queue_wait_s": (None if self.queue_wait_s is None else round(self.queue_wait_s, 2)),
+            "model_s": None if self.model_s is None else round(self.model_s, 2),
         }
 
 
@@ -97,12 +109,21 @@ def log_emitter(event: ListenEvent) -> None:
     The lines are :mod:`rich` texts (see :mod:`dankbot.logs`), so a ``REPLY``
     shows the quip in the colours the display scrolls while its plain text stays
     ``REPLY: …``; the one addition is a dim ``(45s latency)`` suffix when the
-    event carries one.
+    event carries one — split into ``… queue + … model`` once the queue wait is
+    more than noise, so a backlog reads differently from a slow model.
     """
     if event.kind == KIND_REPLY:
-        log.info(logs.reply_line(event.runs, event.reply, latency_s=event.latency_s))
+        log.info(
+            logs.reply_line(
+                event.runs, event.reply, latency_s=event.latency_s, queue_wait_s=event.queue_wait_s
+            )
+        )
     elif event.kind == KIND_SKIP:
-        log.info(logs.skip_line(event.reason, event.text, latency_s=event.latency_s))
+        log.info(
+            logs.skip_line(
+                event.reason, event.text, latency_s=event.latency_s, queue_wait_s=event.queue_wait_s
+            )
+        )
     else:
         log.info(logs.heard_line(event.text))
 
@@ -190,11 +211,18 @@ class Listener:
         try:
             self._queue.put_nowait(pending)
         except queue.Full:
-            # Drop the *oldest* pending utterance and keep the newest.
+            # Drop the *oldest* pending utterance and keep the newest. Worth a
+            # debug line: it is the clearest sign that the model cannot keep up
+            # with the talk (and why a reply's queue_wait_s is climbing).
             try:
-                self._queue.get_nowait()
+                stale = self._queue.get_nowait()
             except queue.Empty:  # pragma: no cover - race, nothing to drop
                 pass
+            else:
+                if isinstance(stale, _Pending):
+                    log.debug(
+                        "reply queue full — dropped the stale utterance %r", stale.utterance.text
+                    )
             try:
                 self._queue.put_nowait(pending)
             except queue.Full:  # pragma: no cover - worker ate the slot
@@ -212,10 +240,15 @@ class Listener:
 
     def _answer(self, pending: _Pending) -> None:
         utterance = pending.utterance
+        # Two clock readings split the wait from the work: how long this
+        # utterance sat in the reply queue (the machine falling behind) and how
+        # long the model itself took. Their sum is the "latency" the log shows.
+        started = time.monotonic()
         reply = self._responder.respond(utterance.text)
-        # Read the clock *after* the model answered: the wait in the queue plus
-        # the round trip is the number the log reports.
-        latency_s = time.monotonic() - pending.heard_at
+        finished = time.monotonic()
+        queue_wait_s = started - pending.heard_at
+        model_s = finished - started
+        latency_s = finished - pending.heard_at
         if reply.skip:
             self._emit(
                 ListenEvent(
@@ -224,6 +257,8 @@ class Listener:
                     reason="notfunny",
                     model=reply.model,
                     latency_s=latency_s,
+                    queue_wait_s=queue_wait_s,
+                    model_s=model_s,
                 )
             )
         else:
@@ -235,6 +270,8 @@ class Listener:
                     model=reply.model,
                     runs=reply.runs,
                     latency_s=latency_s,
+                    queue_wait_s=queue_wait_s,
+                    model_s=model_s,
                 )
             )
             if self._display is not None:
