@@ -7,7 +7,7 @@ misc
 * use thought bubbles
 * !add ai usage to readme
 * overhaul the readme (local ai no creeper)
-* thank model author
+* thank model author https://huggingface.co/TheDrummer/Rocinante-X-12B-v1-GGUF
 * thank voice author
 
 * make demo video

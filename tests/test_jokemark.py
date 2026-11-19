@@ -194,12 +194,17 @@ def test_the_packaged_corpus_extends_the_smoke_file():
     assert all(line == line.lower() for line in corpus)
 
 
-def test_the_packaged_matrix_keeps_the_previously_evaluated_models():
+def test_the_packaged_matrix_runs_the_rocinante_quant_sweep():
+    # The active banks are one model at three quants sharing the `[defaults]`
+    # sampler, so the quant is the only axis between them — that is what makes
+    # the run a quant comparison rather than a model comparison.
     specs = load_matrix(jokemark.packaged_text(jokemark.MATRIX_ASSET))
-    models = {spec.model for spec in specs}
-    assert any("Hermes-3-Llama-3.1-8B" in model for model in models)
-    assert any("Human-Like-Mistral-Nemo" in model for model in models)
-    assert any(spec.temperature == 0.0 for spec in specs)
+    assert {spec.model for spec in specs} == {
+        "hf.co/TheDrummer/Rocinante-X-12B-v1-GGUF:Q2_K",
+        "hf.co/TheDrummer/Rocinante-X-12B-v1-GGUF:Q3_K_M",
+        "hf.co/TheDrummer/Rocinante-X-12B-v1-GGUF:Q4_K_M",
+    }
+    assert len({(spec.temperature, spec.min_p, spec.ctx, spec.max_tokens) for spec in specs}) == 1
 
 
 def test_the_packaged_matrix_still_documents_every_tried_candidate():
@@ -208,6 +213,8 @@ def test_the_packaged_matrix_still_documents_every_tried_candidate():
     # retiring a model must not erase the record of having tried it.
     text = jokemark.packaged_text(jokemark.MATRIX_ASSET)
     for repo in (
+        "NousResearch/Hermes-3-Llama-3.1-8B-GGUF",
+        "bartowski/Human-Like-Mistral-Nemo-Instruct-2407-GGUF",
         "TheDrummer/Rocinante-X-12B-v1-GGUF",
         "mradermacher/gemma3-4b-it-comedy-v2-GGUF",
         "unsloth/gemma-4-12b-it-GGUF",

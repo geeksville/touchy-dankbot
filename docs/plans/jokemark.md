@@ -63,6 +63,16 @@ the bake-off never needs one.
 >   bake-off, and Q4_K_M keeps it Pi-sized). Hermes-3 8B stays in the matrix as
 >   the disciplined baseline and Human-Like Nemo Q8_0 as the 12B runner-up; the
 >   packaged matrix is asserted to contain the default.
+> * **Quant sweep (2026-11-18)** — the matrix now runs the one model that won
+>   the ear test (Rocinante-X 12B) at three quants — `Q2_K` / `Q3_K_M` /
+>   `Q4_K_M`, ≈ 4.8 / 6.1 / 7.5 GB — with an identical `[defaults]` sampler, so
+>   the quant is the only axis and the report's per-row `s` column answers
+>   "is a smaller quant faster?". Every other candidate is retired in place
+>   (@geeksville) as a commented-out block, superseding the 2026-11-17 note that
+>   Hermes-3 8B / Nemo Q8_0 stayed *loaded* as baselines. `DEFAULT_MODEL` is
+>   still the Rocinante Q4_K_M until the sweep says otherwise. The packaged
+>   matrix tests now assert the active sweep, and that every retired candidate
+>   is still *documented* in the raw text.
 > * **JSON sidecar + playback (2026-11-17)** — every run now also writes
 >   `<out>.json` beside the Markdown (`jokemark.json` by default): the same
 >   data, versioned, with replies *untruncated* and their colour runs included

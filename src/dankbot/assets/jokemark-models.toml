@@ -20,6 +20,10 @@
 # To retire a candidate, comment out its `# [[models]]` block and leave the
 # verdict beside it ("# disabled: very unfunny") — the record of having tried it
 # is worth more than a deleted entry.
+#
+# Active today: *one* model (Rocinante-X 12B) at three quants — the quant sweep
+# below. Everything else has been rejected by ear and lives on as a
+# commented-out block.
 
 version = 1
 
@@ -29,44 +33,67 @@ min_p = 0.05
 ctx = 4096
 max_tokens = 120
 
-# --- models already evaluated -------------------------------------------------
-
-# The disciplined baseline — `DEFAULT_MODEL` until the Rocinante-X run.
-[[models]]
-model = "hf.co/NousResearch/Hermes-3-Llama-3.1-8B-GGUF:latest"
-label = "hermes-3-8b"
-
-# The former default's 12B alternative from docs/plans/initial.md. Q8_0 is
-# the biggest quant that still fits beside everything else on the 16 GB Pi 5.
-[[models]]
-model = "hf.co/bartowski/Human-Like-Mistral-Nemo-Instruct-2407-GGUF:Q8_0"
-label = "human-like-nemo-12b"
-
-# The two t= variants exercise the parameter axis and answer the sampler
-# question (does heat help or hurt?) with evidence instead of feel.
-
-# Near-greedy: the model should be consistent but repeat itself.
-[[models]]
-model = "hf.co/NousResearch/Hermes-3-Llama-3.1-8B-GGUF:latest"
-label = "hermes-3-8b t=0.0"
-temperature = 0.0
-
-# Hot: expected to be wilder, at the risk of incoherence.
-[[models]]
-model = "hf.co/bartowski/Human-Like-Mistral-Nemo-Instruct-2407-GGUF:Q8_0"
-label = "human-like-nemo-12b t=1.0"
-temperature = 1.0
-
-# --- smaller Q4_K_M candidates ------------------------------------------------
+# --- active: Rocinante-X 12B, one bank per quant ------------------------------
 #
-# Q4_K_M is the quant that fits a 16 GB Pi 5 alongside the rest of the stack.
-# Rocinante won this group; the other three are retired, with their verdicts.
+# One model, three quants, an identical sampler — so the quant is the *only*
+# axis, and the report's per-row `s` column answers "is a smaller quant faster?"
+# with evidence. On disk: Q2_K ≈ 4.8 GB, Q3_K_M ≈ 6.1 GB, Q4_K_M ≈ 7.5 GB.
+# llama.cpp generation is memory-bandwidth-bound, so the smaller quants should
+# generate roughly in proportion to their size (Q3_K_M ≈ 20% faster than
+# Q4_K_M, Q2_K ≈ 50%+); prompt processing is compute-bound and gains less. The
+# trade is quality: Q3_K_M is the usual sweet spot for a 12B, Q2_K the cliff.
+# Whichever quant wins keeps the plain `rocinante-x-12b` label and becomes
+# `DEFAULT_MODEL` in config.py.
 
-# A 12B "Rocinante" merge — **the current DEFAULT_MODEL**: the funniest of the
-# batch in the bake-off, and Q4_K_M keeps it Pi-sized.
+# Baseline: the current DEFAULT_MODEL (Q4_K_M) — the quips to beat.
 [[models]]
 model = "hf.co/TheDrummer/Rocinante-X-12B-v1-GGUF:Q4_K_M"
 label = "rocinante-x-12b"
+
+# Middle quant: ~20% fewer bytes to move per token than Q4_K_M.
+[[models]]
+model = "hf.co/TheDrummer/Rocinante-X-12B-v1-GGUF:Q3_K_M"
+label = "rocinante-x-12b q3_k_m"
+
+# Smallest quant: the fast end of the sweep; watch for incoherence here.
+[[models]]
+model = "hf.co/TheDrummer/Rocinante-X-12B-v1-GGUF:Q2_K"
+label = "rocinante-x-12b q2_k"
+
+# --- retired: the pre-Rocinante baseline --------------------------------------
+#
+# Hermes-3 8B was `DEFAULT_MODEL` until the first bake-off; Human-Like Mistral
+# Nemo 12B Q8_0 was the 12B runner-up from docs/plans/initial.md. Their two `t=`
+# variants answered the sampler question (heat hurt more than it helped).
+
+# The disciplined baseline.
+# @geeksville disabled superseded by Rocinante-X
+# [[models]]
+# model = "hf.co/NousResearch/Hermes-3-Llama-3.1-8B-GGUF:latest"
+# label = "hermes-3-8b"
+
+# The former default's 12B alternative. Q8_0 was the biggest quant that still
+# fit beside everything else on the 16 GB Pi 5.
+# @geeksville disabled superseded by Rocinante-X
+# [[models]]
+# model = "hf.co/bartowski/Human-Like-Mistral-Nemo-Instruct-2407-GGUF:Q8_0"
+# label = "human-like-nemo-12b"
+
+# Near-greedy: consistent, but it repeated itself.
+# @geeksville disabled superseded by Rocinante-X
+# [[models]]
+# model = "hf.co/NousResearch/Hermes-3-Llama-3.1-8B-GGUF:latest"
+# label = "hermes-3-8b t=0.0"
+# temperature = 0.0
+
+# Hot: wilder, at the risk of incoherence.
+# @geeksville disabled superseded by Rocinante-X
+# [[models]]
+# model = "hf.co/bartowski/Human-Like-Mistral-Nemo-Instruct-2407-GGUF:Q8_0"
+# label = "human-like-nemo-12b t=1.0"
+# temperature = 1.0
+
+# --- retired: the Q4_K_M candidate group (Rocinante won it) -------------------
 
 # Gemma 3 4B tuned on comedy captions: small enough to be fast on the Pi.
 # @geeksville disabled fairly unfunny

@@ -463,7 +463,7 @@ def test_jokemark_dry_run_reads_the_packaged_assets(monkeypatch, tmp_path):
     )
     assert result.exit_code == 0
     assert "models × 3 lines" in result.output
-    assert "hermes-3-8b" in result.output
+    assert "rocinante-x-12b" in result.output
 
 
 def test_jokemark_shows_each_reply_on_an_attached_pad(monkeypatch, tmp_path):
